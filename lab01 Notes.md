@@ -21,13 +21,13 @@ This IP address is the local computer's IP address.
  * `www.kremlin.ru` No
  * `8.8.8.8` Yes
 
-`www.getfittest.com.au` and `www.hola.hp` are not valid hosts and are not reachable from Web browser. `www.kremlin.ru` can be transmitted packets using ping, but 0 packets received; however, it can be reachable by Web browser. ==Possible reason:== Government website has firewall that blocks ping request.
+`www.getfittest.com.au` and `www.hola.hp` are not valid hosts and are not reachable from Web browser. `www.kremlin.ru` can be transmitted packets using ping, but 0 packets received; however, it can be reachable by Web browser. Government website has firewall that blocks ping request for security reason.
 
 ## Exercise 3
 ### 1.
 There are 22 routers.  
 There are 4 routers are part of the UNSW network (1, 3, 4, 5).  
-Crossing the Pacific Ocean is between route 7 (`113.197.15.149`) and route 8 (`113.197.15.99`).  
+Crossing the Pacific Ocean is between route 7 (`113.197.15.149`) and route 8 (`113.197.15.99`) because the time is significantly different.
 
 
 Traceroot result:
@@ -97,7 +97,7 @@ rtt min/avg/max/mdev = 1.809/1.967/2.182/0.139 ms
 ```
 
 ### 2.
-These three paths diverge at `138.44.5.0`. The organizaion of this router is Asia Pacific Network Information Centre (APNIC), and the router locates in Qeensland, which makes sense that those three paths diverge here. Yes, the number of hops on each path is propotional the physical distance, e.g. the path to uk has the most number of hops and uk is indeed the farmost server.
+These three paths diverge at `138.44.5.0`. The organizaion of this router is Asia Pacific Network Information Centre (APNIC), and the router locates in Qeensland, which makes sense that those three paths diverge here. No, the number of hops on each path is not neccessary to be propotional to the physical distance since the number of routers on land is much more than the routers across oceans.
 
 
 ```
