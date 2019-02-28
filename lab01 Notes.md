@@ -1,4 +1,4 @@
-#COMP3331 Lab101
+# COMP3331 Lab101
 
 
 
@@ -24,7 +24,7 @@ This IP address is the local computer's IP address.
 `www.getfittest.com.au` and `www.hola.hp` are not valid hosts and are not reachable from Web browser. `www.kremlin.ru` can be transmitted packets using ping, but 0 packets received; however, it can be reachable by Web browser. ==Possible reason:== Government website has firewall that blocks ping request.
 
 ## Exercise 3
-###1.
+### 1.
 There are 22 routers.  
 There are 4 routers are part of the UNSW network (1, 3, 4, 5).  
 Crossing the Pacific Ocean is between route 7 (`113.197.15.149`) and route 8 (`113.197.15.99`).  
@@ -96,11 +96,10 @@ PING 113.197.15.149 (113.197.15.149) 56(84) bytes of data.
 rtt min/avg/max/mdev = 1.809/1.967/2.182/0.139 ms
 ```
 
-###2.
+### 2.
 These three paths diverge at `138.44.5.0`. The organizaion of this router is Asia Pacific Network Information Centre (APNIC), and the router locates in Qeensland, which makes sense that those three paths diverge here.
 ==the third question How?===
 
-<a id="code"></a>
 
 ```
 wagner % whois 138.44.5.0
