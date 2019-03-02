@@ -488,3 +488,33 @@ traceroute from telstra:
 
 
 
+### 1. 
+Physical distance from UNSW:
+
+* to UQ: 743.01 km (456.09 mi)  
+* to NUS: 6603.49 km (4103.22 mi)
+* to TUB: 16104.74 km (1007.02 mi)
+
+Shortest possible time T from UNSW:
+
+* to UQ: 2.4767 ms
+* to NUS: 22.011633 ms
+* to TUB: 53.682467 ms
+
+
+
+Possible reasons for greater than 2:
+
+1. We assume that the packet moves at the speed of light, but in reality, the propagation speed is impossible to reach the speed of light. Hence, the delay will be greater.
+2. Only propagation delay is counting for T, but actually there are also processing delay, queueing delay and transmission delay, so the mininum delay is greater than assumption.
+3. The shortest distance measured using google map is straight-line distance, but in reality, the path that packets go through is not straight line, which means it takes longer for propagation, hence the delay is greater.
+
+
+### 2.
+
+The delay varies over time, because except for propagation delay, there are also: processing delay and transmission delay, which depends on the specific router; and queueing delay, which depends on the load of the router. Hence, the total delay varies over time.
+
+### 3.
+The one mainly depends on packet size is transmission delay as it is calculated from `packet size / bandwidth`. Queueing delay mainly depends on the load but it is revalent to packet size because is is calculated from `packets size * packets arrival rate / bandwidth`. 
+
+Processing delay and propagation delay don't depend on packet size since processing delay depends on content complexity (as it has to scan and check error) and propagation delay depends on physical distance.
