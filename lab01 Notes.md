@@ -4,7 +4,9 @@
 
 ## Exercise 1
 ### 1.
-Google's IP address: 172.217.25.164
+Google's IP address: 216.58.203.110  
+Reason having serveral IP addresses is becuase there are multiple records for a single hosts
+
 ### 2. 
 name = localhost.
 This IP address is the local computer's IP address.
