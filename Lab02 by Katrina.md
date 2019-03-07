@@ -9,7 +9,7 @@
 
 `Last-Modified: Mon, 04 Mar 2019 04:19:13 GMT\r\n`  
 Response's DATE header: `Date: Thu, 07 Mar 2019 04:10:12 GMT\r\n`  
-The last-modified date is three days earlier than response date.  
+The last-modified date is the time the content modified by the server, and the Response's DATE header is the time that content arrived to the client. In this case, the lase-nidefued date us three days earlier than Response;s date.  
 
 ### Q3.
 The connection is persistent. It refers to the line saying `Connection: keep-alive\r\n`  
@@ -98,8 +98,6 @@ The connection is persistent. It refers to the line saying `Connection: keep-ali
 04a0   26 43 56 a1 12 dd                                 &CV...
 ```
 
-###_Not sure what the question means_
-
 
 ## Exercise 2
 ### Q1.
@@ -127,11 +125,8 @@ No, it didn't return the contents. As `Status Code: 304` indicates that the reso
 It's used by the server to check if the same content needs a new copy of the resource. In this case, the `If-None-Match` header in the 2nd request matches the `ETag` in the 1st respense, which means the browser was requesting the same version as previous request, so the response sent an empty body back and the browser used cached copy of the content.  
 Similaly, the `ETag` in the 2nd response is used for comparing in next requesting from browser, as the current version is the same as the 1st response, the `ETag` wasn't change.
 
-###_Don't know if my understanding correct here._
-
 
 ## Exercise 5
 
-[a resource link](https://stackoverflow.com/questions/27893804/udp-client-server-socket-in-python/27893987)
-
+see `PingClient.py`
 
