@@ -123,7 +123,7 @@ No, it didn't return the contents. As `Status Code: 304` indicates that the reso
 ### Q5.
 `ETag: "1bfef-173-8f4ae900"\r\n`  
 It's used by the server to check if the same content needs a new copy of the resource. In this case, the `If-None-Match` header in the 2nd request matches the `ETag` in the 1st respense, which means the browser was requesting the same version as previous request, so the response sent an empty body back and the browser used cached copy of the content.  
-Similaly, the `ETag` in the 2nd response is used for comparing in next requesting from browser, as the current version is the same as the 1st response, the `ETag` wasn't change.
+Similaly, the `ETag` in the 2nd response is used for comparing in next requesting content from browser, as the current version of content is the same as the 1st response, the `ETag` wasn't change.
 
 
 ## Exercise 5
