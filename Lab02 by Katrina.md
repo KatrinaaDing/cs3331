@@ -129,3 +129,6 @@ Similaly, the `ETag` in the 2nd response is used for comparing in next requestin
 
 ## Exercise 5
 
+[a resource link](https://stackoverflow.com/questions/27893804/udp-client-server-socket-in-python/27893987)
+
+
