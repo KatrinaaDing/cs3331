@@ -113,7 +113,7 @@ Yes.
 Yes.  
 `If-Modified-Since: Tue, 23 Sep 2003 05:35:00 GMT\r\n`  
 `If-None-Match: "1bfef-173-8f4ae900"\r\n`  
-It indicates the "version" of the content
+It indicates the "version" of the content.
 
 ### Q4.
 `Status Code: 304`  
