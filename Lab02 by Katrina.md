@@ -98,6 +98,9 @@ The connection is persistent. It refers to the line saying `Connection: keep-ali
 04a0   26 43 56 a1 12 dd                                 &CV...
 ```
 
+###_Not sure what the question means_
+
+
 ## Exercise 2
 ### Q1.
 `If-Modified-Since` is contained in the second HTTP GET request but not the first HTTP GET request.  
