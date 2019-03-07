@@ -1,6 +1,6 @@
 # Lab02 by Katrina
 
-## Exercise 1
+## Exercise 2
 ### Q1.
 `Status Code: 200`  
 `Response Phrase: OK`
@@ -99,7 +99,7 @@ The connection is persistent. It refers to the line saying `Connection: keep-ali
 ```
 
 
-## Exercise 2
+## Exercise 4
 ### Q1.
 `If-Modified-Since` is contained in the second HTTP GET request but not the first HTTP GET request.  
 
@@ -112,7 +112,8 @@ Yes.
 ### Q3.
 Yes.  
 `If-Modified-Since: Tue, 23 Sep 2003 05:35:00 GMT\r\n`  
-`If-None-Match: "1bfef-173-8f4ae900"\r\n`
+`If-None-Match: "1bfef-173-8f4ae900"\r\n`  
+It indicates the "version" of the content
 
 ### Q4.
 `Status Code: 304`  
