@@ -1,5 +1,27 @@
 # Lab03 by Katrina
 
+## Exercise 2
+### Q1.
+UDP.  
+`Protocol: UDP (17)`  
+
+### Q2.
+`Source Port: 3742`  
+`Destination Port: 53`  
+
+### Q3. 
+`Destination: 128.238.29.22`  
+No. The default local DNS server is `128.238.29.22`.  
+
+### Q4. 
+1 Question. `Questions: 1`  
+Type A. `www.mit.edu: type A, class IN`  
+No, the query message doesn't contain answer. `Answer RRs: 0`  
+
+### Q5.
+`Answers` stores the IP address corresponding to the input name; `Authoritative nameserver` stores other authorized name servers; `Additional record` stores the Type A (IP address) DNS of those name servers.  
+
+
 ## Exercise 3
 ### Q1. 
 Type `A`. As type `A` stores the IP address for a name.  
@@ -120,6 +142,175 @@ ns4.cecs.anu.edu.au.	3349	IN	AAAA	2001:388:1034:2905::26
 ;; MSG SIZE  rcvd: 219
 
 ```
+
+### Q6. *Why do I have two hostnames/domains?* 
+It's `engplws008.ad.unsw.edu.au.` and `engplws008.eng.unsw.edu.au.`. The type of DNS query is PTR, which maps an IP address to a hostname (like reverse Type A).  
+ 
+
+```
+z5211336@vx1:.../2/z5211336$ dig -x 149.171.158.109
+
+; <<>> DiG 9.7.3 <<>> -x 149.171.158.109
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 35976
+;; flags: qr rd ra; QUERY: 1, ANSWER: 2, AUTHORITY: 6, ADDITIONAL: 5
+
+;; QUESTION SECTION:
+;109.158.171.149.in-addr.arpa.	IN	PTR
+
+;; ANSWER SECTION:
+109.158.171.149.in-addr.arpa. 139 IN	PTR	engplws008.ad.unsw.edu.au.
+109.158.171.149.in-addr.arpa. 139 IN	PTR	engplws008.eng.unsw.edu.au.
+
+;; AUTHORITY SECTION:
+in-addr.arpa.		31603	IN	NS	f.in-addr-servers.arpa.
+in-addr.arpa.		31603	IN	NS	d.in-addr-servers.arpa.
+in-addr.arpa.		31603	IN	NS	e.in-addr-servers.arpa.
+in-addr.arpa.		31603	IN	NS	b.in-addr-servers.arpa.
+in-addr.arpa.		31603	IN	NS	a.in-addr-servers.arpa.
+in-addr.arpa.		31603	IN	NS	c.in-addr-servers.arpa.
+
+;; ADDITIONAL SECTION:
+a.in-addr-servers.arpa.	36444	IN	A	199.180.182.53
+c.in-addr-servers.arpa.	49412	IN	A	196.216.169.10
+d.in-addr-servers.arpa.	80013	IN	A	200.10.60.53
+e.in-addr-servers.arpa.	71996	IN	A	203.119.86.101
+f.in-addr-servers.arpa.	5387	IN	A	193.0.9.1
+
+;; Query time: 0 msec
+;; SERVER: 129.94.242.45#53(129.94.242.45)
+;; WHEN: Thu Mar 14 14:30:05 2019
+;; MSG SIZE  rcvd: 306
+```
+
+
+### Q7. *What does it mean by "does not mean it came from an authoritative name server"?*
+
+```
+z5211336@vx1:.../2/z5211336$ dig @129.94.242.33 yahoo.com MX
+
+; <<>> DiG 9.7.3 <<>> @129.94.242.33 yahoo.com MX
+; (1 server found)
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 35258
+;; flags: qr rd ra; QUERY: 1, ANSWER: 3, AUTHORITY: 5, ADDITIONAL: 8
+
+;; QUESTION SECTION:
+;yahoo.com.			IN	MX
+
+;; ANSWER SECTION:
+yahoo.com.		159	IN	MX	1 mta5.am0.yahoodns.net.
+yahoo.com.		159	IN	MX	1 mta6.am0.yahoodns.net.
+yahoo.com.		159	IN	MX	1 mta7.am0.yahoodns.net.
+
+;; AUTHORITY SECTION:
+yahoo.com.		67943	IN	NS	ns2.yahoo.com.
+yahoo.com.		67943	IN	NS	ns1.yahoo.com.
+yahoo.com.		67943	IN	NS	ns3.yahoo.com.
+yahoo.com.		67943	IN	NS	ns4.yahoo.com.
+yahoo.com.		67943	IN	NS	ns5.yahoo.com.
+
+;; ADDITIONAL SECTION:
+ns1.yahoo.com.		451657	IN	A	68.180.131.16
+ns1.yahoo.com.		14049	IN	AAAA	2001:4998:130::1001
+ns2.yahoo.com.		461546	IN	A	68.142.255.16
+ns2.yahoo.com.		1394	IN	AAAA	2001:4998:140::1002
+ns3.yahoo.com.		71802	IN	A	203.84.221.53
+ns3.yahoo.com.		72496	IN	AAAA	2406:8600:b8:fe03::1003
+ns4.yahoo.com.		290158	IN	A	98.138.11.157
+ns5.yahoo.com.		354473	IN	A	119.160.253.83
+
+;; Query time: 0 msec
+;; SERVER: 129.94.242.33#53(129.94.242.33)
+;; WHEN: Thu Mar 14 14:05:41 2019
+;; MSG SIZE  rcvd: 360
+```
+
+### Q8.
+It doesn't have answer and the status is `REFUSED` (recursive query denided). Also, flags in header only has `qr` and `rd` but not `ra` (recursive available).  
+
+```
+z5211336@vx1:.../2/z5211336$ dig @150.203.161.36 yahoo.com MX
+
+; <<>> DiG 9.7.3 <<>> @150.203.161.36 yahoo.com MX
+; (1 server found)
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: REFUSED, id: 21564
+;; flags: qr rd; QUERY: 1, ANSWER: 0, AUTHORITY: 0, ADDITIONAL: 0
+;; WARNING: recursion requested but not available
+
+;; QUESTION SECTION:
+;yahoo.com.			IN	MX
+
+;; Query time: 8 msec
+;; SERVER: 150.203.161.36#53(150.203.161.36)
+;; WHEN: Thu Mar 14 14:44:57 2019
+;; MSG SIZE  rcvd: 27
+```
+
+### Q9. 
+`MX` is sent.
+
+```
+z5211336@vx1:.../2/z5211336$ dig yahoo.com MX
+
+; <<>> DiG 9.7.3 <<>> yahoo.com MX
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 54748
+;; flags: qr rd ra; QUERY: 1, ANSWER: 3, AUTHORITY: 5, ADDITIONAL: 8
+
+;; QUESTION SECTION:
+;yahoo.com.			IN	MX
+
+;; ANSWER SECTION:
+yahoo.com.		238	IN	MX	1 mta5.am0.yahoodns.net.
+yahoo.com.		238	IN	MX	1 mta6.am0.yahoodns.net.
+yahoo.com.		238	IN	MX	1 mta7.am0.yahoodns.net.
+
+;; AUTHORITY SECTION:
+yahoo.com.		65117	IN	NS	ns4.yahoo.com.
+yahoo.com.		65117	IN	NS	ns2.yahoo.com.
+yahoo.com.		65117	IN	NS	ns5.yahoo.com.
+yahoo.com.		65117	IN	NS	ns3.yahoo.com.
+yahoo.com.		65117	IN	NS	ns1.yahoo.com.
+
+;; ADDITIONAL SECTION:
+ns1.yahoo.com.		347687	IN	A	68.180.131.16
+ns1.yahoo.com.		11223	IN	AAAA	2001:4998:130::1001
+ns2.yahoo.com.		351646	IN	A	68.142.255.16
+ns2.yahoo.com.		111338	IN	AAAA	2001:4998:140::1002
+ns3.yahoo.com.		68976	IN	A	203.84.221.53
+ns3.yahoo.com.		7758	IN	AAAA	2406:8600:b8:fe03::1003
+ns4.yahoo.com.		83190	IN	A	98.138.11.157
+ns5.yahoo.com.		428812	IN	A	119.160.253.83
+
+;; Query time: 6 msec
+;; SERVER: 129.94.242.45#53(129.94.242.45)
+;; WHEN: Thu Mar 14 14:52:47 2019
+;; MSG SIZE  rcvd: 360
+```
+
+### Q10.
+6 DNS servers I have to query.  
+
+1. for `.` (NS)
+2. for `au.` (NS)
+3. for `edu.au.` (NS)
+4. for `unsw.edu.au` (NS)
+5. for `cse.unsw.edu.au` (NS)
+6. for `lyre00.cse.unsw.edu.au` (A)  
+
+
+### Q11.
+Yes, e.g. virtual machine.  
+
+## Exercise 4
+
+
 
 
 
