@@ -99,9 +99,12 @@ ns4.cecs.anu.edu.au.	1216	IN	AAAA	2001:388:1034:2905::26
 ;; MSG SIZE  rcvd: 244 
 ```
 
-### Q3. *What is it mean by "make of"?*
+### Q3.
 The Authority Section displays the autority DNS servers for that domain (it may be contained in secondary zones).  
+From the above example, the Authority Section has three name servers with Type `NS`.
+
 The Additional Section displays those IPv4 addresses of the authoritive name servers in IPv6.  
+From the above example, the Additional Section, the Type A records stores IPv4 address, and the Type AAAA records stores IPv6 address. Each pair of them corresponds to same name server.
 
 ### Q4.
 At the end of `dig` result, it's `129.94.208.3`.  
@@ -143,7 +146,7 @@ ns4.cecs.anu.edu.au.	3349	IN	AAAA	2001:388:1034:2905::26
 
 ```
 
-### Q6. *Why do I have two hostnames/domains?* 
+### Q6. 
 It's `engplws008.ad.unsw.edu.au.` and `engplws008.eng.unsw.edu.au.`. The type of DNS query is PTR, which maps an IP address to a hostname (like reverse Type A).  
  
 
@@ -185,7 +188,8 @@ f.in-addr-servers.arpa.	5387	IN	A	193.0.9.1
 ```
 
 
-### Q7. *What does it mean by "does not mean it came from an authoritative name server"?*
+### Q7.   
+No, as the flags don't contain `AA` flag, which means it's not the authoritative answer.
 
 ```
 z5211336@vx1:.../2/z5211336$ dig @129.94.242.33 yahoo.com MX
@@ -229,7 +233,7 @@ ns5.yahoo.com.		354473	IN	A	119.160.253.83
 ```
 
 ### Q8.
-It doesn't have answer and the status is `REFUSED` (recursive query denided). Also, flags in header only has `qr` and `rd` but not `ra` (recursive available).  
+It doesn't have answer and the status is `REFUSED` (recursive query denided. Also, flags in header only has `qr` and `rd` but not `ra` (recursive available).  
 
 ```
 z5211336@vx1:.../2/z5211336$ dig @150.203.161.36 yahoo.com MX
