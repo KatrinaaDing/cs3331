@@ -564,10 +564,7 @@ beethoven.orchestra.cse.unsw.edu.au. 3600 IN A	129.94.208.3
 
 
 ### Q11.
-One physical machine CAN have serval names (e.g. alias) but ONLY ONE IP addresses  is associated with it.
-
-## Exercise 4
-
+One physical machine CAN have serveral names (e.g. alias) but ONLY ONE IP addresses  is associated with it.
 
 
 
