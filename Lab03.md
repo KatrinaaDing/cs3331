@@ -63,7 +63,7 @@ ns4.cecs.anu.edu.au.	1152	IN	AAAA	2001:388:1034:2905::26
 
 ### Q2.
 The canonical name is `rproxy.cecs.anu.edu.au`. It's IP address is `150.203.161.98`.  
-### *Giving out the reason*
+The alias is easier for people to memorize.
 
 ```
 z5211336@cs3331$  dig www.cecs.anu.edu.au CNAME
@@ -106,8 +106,37 @@ From the above example, the Authority Section has three name servers with Type `
 The Additional Section displays those IPv4 addresses of the authoritive name servers in IPv6.  
 From the above example, the Additional Section, the Type A records stores IPv4 address, and the Type AAAA records stores IPv6 address. Each pair of them corresponds to same name server.
 
-### Q4.
-At the end of `dig` result, it's `129.94.208.3`.  
+### Q4. 
+The IP address of the local nameserver is `127.0.0.1`.  
+
+```
+z5211336@drum15:~$ dig localhost
+
+; <<>> DiG 9.7.3 <<>> localhost
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 6086
+;; flags: qr rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 1, ADDITIONAL: 1
+
+;; QUESTION SECTION:
+;localhost.			IN	A
+
+;; ANSWER SECTION:
+localhost.		63755	IN	A	127.0.0.1
+
+;; AUTHORITY SECTION:
+localhost.		63755	IN	NS	localhost.
+
+;; ADDITIONAL SECTION:
+localhost.		63755	IN	AAAA	::1
+
+;; Query time: 0 msec
+;; SERVER: 129.94.208.3#53(129.94.208.3)
+;; WHEN: Thu Mar 14 18:58:21 2019
+;; MSG SIZE  rcvd: 85
+```
+
+
 
 ### Q5.
 The name servers are `ns2.cecs.anu.edu.au`, `ns3.cecs.anu.edu.au`, `ns4.cecs.anu.edu.au`.  
