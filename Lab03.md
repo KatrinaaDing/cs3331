@@ -288,42 +288,44 @@ z5211336@vx1:.../2/z5211336$ dig @150.203.161.36 yahoo.com MX
 `MX` is sent.
 
 ```
-z5211336@vx1:.../2/z5211336$ dig yahoo.com MX
+z5211336@drum15:~$ dig @ns2.yahoo.com. yahoo.com MX
 
-; <<>> DiG 9.7.3 <<>> yahoo.com MX
+; <<>> DiG 9.7.3 <<>> @ns2.yahoo.com. yahoo.com MX
+; (1 server found)
 ;; global options: +cmd
 ;; Got answer:
-;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 54748
-;; flags: qr rd ra; QUERY: 1, ANSWER: 3, AUTHORITY: 5, ADDITIONAL: 8
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 29803
+;; flags: qr aa rd; QUERY: 1, ANSWER: 3, AUTHORITY: 5, ADDITIONAL: 8
+;; WARNING: recursion requested but not available
 
 ;; QUESTION SECTION:
 ;yahoo.com.			IN	MX
 
 ;; ANSWER SECTION:
-yahoo.com.		238	IN	MX	1 mta5.am0.yahoodns.net.
-yahoo.com.		238	IN	MX	1 mta6.am0.yahoodns.net.
-yahoo.com.		238	IN	MX	1 mta7.am0.yahoodns.net.
+yahoo.com.		1800	IN	MX	1 mta6.am0.yahoodns.net.
+yahoo.com.		1800	IN	MX	1 mta7.am0.yahoodns.net.
+yahoo.com.		1800	IN	MX	1 mta5.am0.yahoodns.net.
 
 ;; AUTHORITY SECTION:
-yahoo.com.		65117	IN	NS	ns4.yahoo.com.
-yahoo.com.		65117	IN	NS	ns2.yahoo.com.
-yahoo.com.		65117	IN	NS	ns5.yahoo.com.
-yahoo.com.		65117	IN	NS	ns3.yahoo.com.
-yahoo.com.		65117	IN	NS	ns1.yahoo.com.
+yahoo.com.		172800	IN	NS	ns1.yahoo.com.
+yahoo.com.		172800	IN	NS	ns3.yahoo.com.
+yahoo.com.		172800	IN	NS	ns2.yahoo.com.
+yahoo.com.		172800	IN	NS	ns5.yahoo.com.
+yahoo.com.		172800	IN	NS	ns4.yahoo.com.
 
 ;; ADDITIONAL SECTION:
-ns1.yahoo.com.		347687	IN	A	68.180.131.16
-ns1.yahoo.com.		11223	IN	AAAA	2001:4998:130::1001
-ns2.yahoo.com.		351646	IN	A	68.142.255.16
-ns2.yahoo.com.		111338	IN	AAAA	2001:4998:140::1002
-ns3.yahoo.com.		68976	IN	A	203.84.221.53
-ns3.yahoo.com.		7758	IN	AAAA	2406:8600:b8:fe03::1003
-ns4.yahoo.com.		83190	IN	A	98.138.11.157
-ns5.yahoo.com.		428812	IN	A	119.160.253.83
+ns1.yahoo.com.		1209600	IN	A	68.180.131.16
+ns2.yahoo.com.		1209600	IN	A	68.142.255.16
+ns3.yahoo.com.		1209600	IN	A	203.84.221.53
+ns4.yahoo.com.		1209600	IN	A	98.138.11.157
+ns5.yahoo.com.		1209600	IN	A	119.160.253.83
+ns1.yahoo.com.		86400	IN	AAAA	2001:4998:130::1001
+ns2.yahoo.com.		86400	IN	AAAA	2001:4998:140::1002
+ns3.yahoo.com.		86400	IN	AAAA	2406:8600:b8:fe03::1003
 
-;; Query time: 6 msec
-;; SERVER: 129.94.242.45#53(129.94.242.45)
-;; WHEN: Thu Mar 14 14:52:47 2019
+;; Query time: 149 msec
+;; SERVER: 68.142.255.16#53(68.142.255.16)
+;; WHEN: Thu Mar 14 19:38:06 2019
 ;; MSG SIZE  rcvd: 360
 ```
 
