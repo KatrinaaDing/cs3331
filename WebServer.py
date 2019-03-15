@@ -1,5 +1,6 @@
 
 from socket import *
+from sys import *
 
 port = 8080 # default web port
 soc = socket(AF_INET, SOCK_STREAM)
@@ -13,11 +14,28 @@ while 1:
 	#msg.decode()
 	file = msg.split()[1]
 	f = file[1:]
-	fp = open(f)
+	
+	try:
+		fp = open(f,'rb')
+	except:
+		ok_msg = """
+		HTTP/1.1 404 Not Found\n
+		"""
+		ok_msg = ok_msg.encode()
+		clientSoc.send(ok_msg)
+		clientSoc.close()
+		exit()
+	 
 	content = fp.read()
-	content = content.encode()
-	# print(content)
 	fp.close()
-	clientSoc.send(content)
 
-clientSoc.close()
+	ok_msg = """
+	HTTP/1.1 200 OK\n
+	Content-Type: text/html\n
+	"""
+	ok_msg = ok_msg.encode()
+	
+	clientSoc.send(ok_msg)
+	clientSoc.send(content)
+	clientSoc.close()
+
