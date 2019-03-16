@@ -14,6 +14,9 @@ while 1:
 	
 	print("\nmsg:\n" + str(msg) + "\n\n-------------------")
 
+	# resend if header lost
+	if msg == b'': continue
+
 	# extract the file name
 	file = msg.split()[1]
 	f = file[1:]
@@ -34,6 +37,10 @@ while 1:
 		fail_msg = fail_msg.encode()
 		clientSoc.send(fail_msg)
 		clientSoc.close()
+
+		finish = input("finish? (y/n)")
+		if finish == 'y': break
+
 		continue
 	
 	# if successfully opened the file, send 200 and identify file type
@@ -66,5 +73,4 @@ while 1:
 	clientSoc.close()
 
 	finish = input("finish? (y/n)")
-	if finish == y: break
-	
+	if finish == 'y': break
