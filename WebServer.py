@@ -1,8 +1,11 @@
-
 from socket import *
-from sys import *
+import sys
 
-port = 8080 # default web port
+if len(sys.argv) == 1: 
+	print("PORT NUMBER!!!!")
+	exit()
+
+port = int(sys.argv[1])
 soc = socket(AF_INET, SOCK_STREAM)
 
 soc.bind(('', port))
@@ -59,16 +62,17 @@ while 1:
 
 
 		"""
-	print("\nok_msg:\n" + str(ok_msg) + "\n\n-------------------")
+	print("\nok_msg:\n" + ok_msg + "\n\n-------------------")
 	ok_msg = ok_msg.encode()
 
 	content = fp.read()
-	# print("\ncontent:\n" + str(content) + "\n\n-------------------")
+	print("\ncontent:\n" + str(content) + "\n\n-------------------")
 	fp.close()
 	print("========file end==sending data========\n")
 
-	ok_msg += content
+	# ok_msg += content
 	clientSoc.send(ok_msg)
+	clientSoc.send(content)
 	# print(ok_msg)
 	clientSoc.close()
 
