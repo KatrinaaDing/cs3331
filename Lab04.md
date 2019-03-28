@@ -8,7 +8,7 @@ Client (the host)'s IP address: `192.168.1.102`, port: `1161`.
 
 ### Q2.
 Corresponding sequence#: `232129013`.  
-Segment data:
+Segment data (next page):
 
 ```
 0000   00 06 25 da af 73 00 20 e0 8a 70 1a 08 00 45 00   ..%..s. ..p...E.
@@ -176,7 +176,8 @@ Segment data:
 	\end{aligned}
 	$$
 	
-### Q5. No idea
+### Q5. 
+The minimum buffer space related to the minimum window size during the connection, which is `16384`. Yes, if there is lack of receiver buffer space, the window size sent to sender will be restrict and throttle the sender.
 
 ### Q6. 
 There are no retransmitted segments because there isn't any repeating ACK number and all of the sequence number sent by sender are in increasing order, which means the sender never (re)sent an "old" segment.
@@ -184,7 +185,7 @@ There are no retransmitted segments because there isn't any repeating ACK number
 ### Q7.
 By observing the trace, finding that initially an ACK acknoledged 1460 bytes of data (from TCP segment length of corresponding segment). However, from segment No. 69, TCP started to acknowledge every two segments from sender, which contains 2 * 1460 = 2920 bytes data.
 
-### Q8. can't identify last ACK
+### Q8. 
 **Brain storming:**  
 Throughput = data transmitted/time.  
 In this trace, consider "time" as the total time of connection, which is the difference between when the first POST HTTP segment was sent (0.026477s), and when the last ACK is received (5.45583s).    
@@ -202,7 +203,7 @@ $$
 $$
 
 
-## Exercise 7
+## Exercise 2
 ### Q1. 
 sequence number of TCP SYN: `2818463618`.	
 
@@ -215,14 +216,16 @@ sequence nubmer:  `2818463619`.
 ACK nubmer: `1247095791`.  
 No, ACK doesn't contain data, it only contain ACKbit in header. 
 
-### Q4.what type of closure???3 or 4??
-Client has done the closed by sending the first FIN and last ACK. It's 3 Segment close.
+### Q4.
+Both client and server have done the active close as they send FIN to each other. As the client and the server sent the FIN at the same time, it's simultaneous close.
 
 ### Q5.
-301 & 298 (client -> server):  
-2818463652 - 2818463619(initial seq#) = 33 bytes   
+No.301 & No.298 (client -> server):  
+2818463652 - 2818463619 = 33 bytes   
 
-302 & 303 (server -> client):  
+No.302 & No.303 (server -> client):  
 1247095831 - 1247095791 = 40 bytes  
+
+Totally `33 + 40 = 73 bytes` were sent during the connection.  
 
 They are equal (both `2818463618`).
