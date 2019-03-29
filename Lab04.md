@@ -228,4 +228,4 @@ No.302 & No.303 (server -> client):
 
 Totally `33 + 40 = 73 bytes` were sent during the connection.  
 
-They are equal (both `2818463618`).
+data transfer = Final ACK - Initial Sequence Number
