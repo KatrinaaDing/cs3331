@@ -31,35 +31,37 @@ However, this causes a packet drop at time 1.0 as Node 4 is overload.
 
 ## Exercise 2
 ### Q1.
+Because during that time, tcp1 is sharing bandwidth with tcp2 and tcp4 but tcp2 is only sharing with tcp3. According to tcp fairness, tcp2 occupies more bandwidth than tcp1, therefore it has higher throughput.
 
 ### Q2.
 tcp1 is using Slow Start, so at the beginning it's looking for bandwitch with maximum utilization.
+
 ### Q3. 
+Because the maximum bandwidth is 2.5Mbps and it has to be distrbuted to at least two tcp connection. From the graph, can see that while other tcp occupies 1Mbps, another sharing tcp can only occupies up to `2.5 - 1 = 1.5Mbps`.
 
 
 ## Exercise 3
 ### Q1.
-Data size 2000 and 3500 caused fragmentation. 1922.168.1.103 has fragmented the original datagram. 2 fragments have been created when data size is 2000.For example, for the first ping with data size 2000, the first fragment 1500 bytes, the second one is 548 bytes.
+Data size 2000 and 3500 caused fragmentation. 192.168.1.103 has fragmented the original datagram. 2 fragments have been created when data size is 2000.For example, for the first ping with data size 2000, the first fragment 1500 bytes, the second one is 548 bytes.
 
 
 ### Q2.
-Yes. It can be seen from No.42, No.43 and No.44.
-#WHY
+Yes. It can be seen from No.42, No.43 and No.44. Yes, the reply also get fragmented as it's on ICMP protocol and the incoming packets are fragmented.  
 
 ### Q3.
-The first fragment:  
+**The first fragment:**  
 ID: 0x7a7b  
 length: 1500  
 flag: 0x01 (More Fragmetns)  
 offset: 0  
 
-The second fragment:  
+**The second fragment:**  
 ID: 0x7a7b  
 length: 1500  
 flag: 0x01 (More Fragments)  
 offset: 1480  
 
-The third fragment:  
+**The third fragment:**  
 ID: 0x7a7b  
 length: 568  
 flag: 0x00  
