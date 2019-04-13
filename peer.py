@@ -35,6 +35,7 @@ class Peer():
     def listenPing(parameter_list):
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         port = 50000 + self.id
+        # receiving UDP need a socket
         server_socket.bind(('localhost', port))
         while True:
             recvMsg, clientAddr = server_socket.recvfrom(1024)
