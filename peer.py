@@ -16,6 +16,7 @@ class Peer():
         sendMsg = "A ping request message was received from Peer " + self.id
         for s in [self.successor, self.successor.successor]:
             
+            # UDP only need 1 socket, destAddr, destport
             port = 50000 + s.id
             addr = ('localhost', port)
 
