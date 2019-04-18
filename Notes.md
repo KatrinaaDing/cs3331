@@ -34,12 +34,12 @@ def Main():
     port = int > 1024 (reserve space)
 
     # create a TCP socket
-    s = socket.socket()
-    # bind the socket to the porst
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    # bind the socket to the port
     s.bind((host,port))
     # accept 1 connection at a time
     s.listen(1)
-    # store the client socket that accpet and the source address
+    # store the connection socket that accpet and the source address
     c, addr = s.accept() # return new socket
     pirnt("connection from: " + str(addr))
 
