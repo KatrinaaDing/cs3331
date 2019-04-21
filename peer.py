@@ -9,6 +9,7 @@ header: "id port-to-listen"
 '''
 FILE_REQUEST = 2
 FILE_RESPONSE = 1
+QUIT_NOTIFY = 3
 
 logging.basicConfig(level=logging.DEBUG,
                     format='(%(threadName)-10s) %(message)s',
@@ -22,6 +23,7 @@ class Peer(threading.Thread):
         self._next = int(next)
         self._secNext = int(secNext)
         self._prev = None
+        self._secPrev = None
         self._dropRate = float(dropRate)
         self._UDPheader = f'{self._id} {self._id+50000}' # UDPheader: id port-to-listen
         #self._TCPheader = f'{self._id} {self._id+50000}'
@@ -31,6 +33,7 @@ class Peer(threading.Thread):
         assert(self._dropRate >= 0 and self._dropRate <= 1)
     
     # check if self is the one having file
+    print("My first successor is now peer {self.next}")
     def checkFile(self, file):
         assert(type(file) is int and file >= 0 and file <= 9999)
         expectedPeer = self.hashFunc(file)
@@ -62,13 +65,59 @@ class Peer(threading.Thread):
         assert(len(check) == 3)    
         return header
     
-                    
-    def notifyDepart(self):
-        print(f'Peer {self.id} will depart from the network.')
+    def updatePrev(self, srcId):
+        print(f'srcId is {srcId}, type is {type(srcId)}')
+        assert(type(srcId) is int)
+        if srcId in [self.secPrev, self.prev]:
+            print("updatePrev: srcId already in prev")
+            return True
 
-    def notifySucc(self):
-        print(f'My first successor is now peer {self.next.id}')
-        print(f'My second successor is not peer {self.next.id}')
+        assert (srcId not in [self.secPrev, self.prev])
+        
+        if self.prev is None or self.secPrev is None:
+            print('one of prev is None')
+            if self.prev is None:
+                print('prev is None, now set prev=srcId')
+                self.prev = srcId
+            elif self.secPrev is None:
+                print('secprev is None, now set secPrev=srcId')
+                self.secPrev = srcId
+        else:
+            print('both prev are not None')
+            if self.secPrev > self.prev:
+                print('found that secPrive > prev, exchange')
+                tmp = self.prev
+                self.prev = self.secPrev
+                self.secPrev = tmp
+            assert (self.prev > self.secPrev)
+            
+            if (srcId > self.prev):
+                print('srcId > prev, replace prev')
+                self.secPrev = self.prev
+                self.prev = srcId
+                return True
+            
+            elif (srcId < self.prev) and (srcId > self.secPrev):
+                print('secPrev < srcId < prev, replace secPrev')
+                self.secPrev = srcId
+                return True
+            
+        # should never get to this stage
+        assert(False)
+    
+    def updateNext(self, new_next, new_secNext):
+        new_next = int(new_next)
+        new_secNext = int(new_secNext)
+        assert(new_secNext > new_next)
+        
+        self.next = new_next
+        self.secNext = new_secNext
+        print(f"My first successor is now peer {self.next}.")
+        print(f"My second successor is now peer {self.secNext}.")
+        
+    def notifyDepart(self, id):
+        print(f'Peer {id} will depart from the network.')
+
 
     def __str__(self):
         msg = f"[Peer {self.id}] with [Succ {self.next} and [secSucc {self.secNext}]]"
@@ -92,7 +141,10 @@ class Peer(threading.Thread):
     @property
     def prev(self):
         return self._prev
-
+    @property
+    def secPrev(self):
+        return self._secPrev
+    
     @property
     def dropRate(self):
         return self._dropRate 
@@ -115,7 +167,11 @@ class Peer(threading.Thread):
     @prev.setter
     def prev(self, predecessor):
         self._prev = predecessor
-
+        
+    @secPrev.setter
+    def secPrev(self, secPrev):
+        self._secPrev = secPrev
+        
 class UDPSender(Peer):
     def run(self):
         print("UDP Sender thread: start sending ping")
@@ -133,7 +189,6 @@ class UDPSender(Peer):
                 c_socket.settimeout(3.0)
                 try:
                     data, serverAddr = c_socket.recvfrom(1024)
-                    
                 except socket.timeout:
                     print(f"Sender thread: <PACKET LOST> to Peer {s}")
                 else:
@@ -165,6 +220,12 @@ class UDPListener(Peer):
                 pass
             elif "request" in recvMsg:
                 print(f'Listener thread: received from Peer {srcId}')
+                try:
+                    self.updatePrev(srcId)
+                except:
+                    print(f"Peer {self.id}: fail to update prev and secPrev")
+                    
+                print(f"Peer {self.id}: [Prev: {self.prev}] [nextPrev: {self.secPrev}]")
                 sendMsg = f"A ping response message was received from Peer {self.id}."
                 s_socket.sendto(sendMsg.encode('utf-8'), srcAddr)
 
@@ -184,7 +245,6 @@ class TCPHandler(Peer):
         # create socket
         listen_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         listen_socket.bind(('localhost', 50000+self.id))
-        
         
         while(True):
             listen_socket.listen(1)
@@ -226,5 +286,16 @@ class TCPHandler(Peer):
                 respondingPeer = header[0]
                 print(f"TCP handler: Received a response message from peer {respondingPeer}, which has the file {file}.")
             
+            # when the peer is leaving 
+            elif msgType is QUIT_NOTIFY:
+                recvMsg = recvMsg.split()
+                assert(len(recvMsg) == 2)
+                new_next = recvMsg[0]
+                new_secNext = recvMsg[1]
+                depart_msg = ' '.join(recvMsg[2:])
+                print(depart_msg)
+                self.updateNext(new_next, new_secNext)
+                
+                
             conn.close()
                 
