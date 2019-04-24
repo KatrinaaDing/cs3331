@@ -4,49 +4,56 @@ import socket
 import pickle, itertools
 import threading
 import sys
-import logging
 import time
 import copy
 
-logging.basicConfig(level=logging.DEBUG,
-                    format='(%(threadName)-10s) %(message)s',
-                    )
+startTime = time.time()
 
 FILE_REQUEST = 2        # requesting a file
 FILE_RESPONSE = 1       # responding to requesting peer that I have the file
 QUIT_NOTIFY = 3         # notifying others that I'm leaving
 INFO_REQUEST = 4        # requesting my successors infomation
 INFO_RESPONSE = 5       # response to INFO_REQUEST
-INVALID = -1
-FINISH = False
+FINISH = False          # flag to stop all threa
 
-print(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[5])
-myId = int(sys.argv[1])
-mySucc1 = int(sys.argv[2])
-mySucc2 = int(sys.argv[3])
-myPrev1 = None
-myPrev2 = None
-dropRate = float(sys.argv[5])
+#for data transfer
+ACK = 100               # is sent by receiver
+PAYLOAD = 200           # is sent by sender
+FIN = 300               # is sent by sender, notifying that all data are sent
+FINACK = 400            # is sent by receiver, notifying that it has received the FIN
 
+targetFile = None       # the file to send/receive
+
+# for sender (file holder)      # reason having seperate: 
+IM_SENDER = False               # a peer might be both sender and receiver
+theReceiver = -1
+lastSentSeq = -1
+lastRecvAck = -1
+
+# for receiver (reqeusitng peer)
+IM_RECEIVER = False
+theSender = -1
+lastRecvSeq = -1
+lastSentAck = -1
+
+myId = int(sys.argv[1])         # read my id from command line
+mySucc1 = int(sys.argv[2])      # read my first successor
+mySucc2 = int(sys.argv[3])      # read my second successor
+myPrev1 = None                  # first predecessor will be known from ping reqeust
+myPrev2 = None                  # second predecessor will be known from ping request
+MSS = int(sys.argv[4])          # read Maximum Segment Size from command line
+dropRate = float(sys.argv[5])   # read drop rate from command line
+
+# some assertion for correct input
 assert(type(myId) is int and myId >= 0 and myId <= 255)
 assert(type(mySucc1) is int and mySucc1 >= 0 and mySucc1 <= 255)
 assert(type(mySucc2) is int and mySucc2 >= 0 and mySucc2 <= 255)
 assert(dropRate >= 0 and dropRate <= 1)
 
-print('set up peer with id ' + sys.argv[1])
+print(f'Seting up peer with id {myId}...')
 
-# print("PL is alive: " + str(UDPL.is_alive()))
-# print("pS is alive: " + str(UDPS.is_alive()))
-# print("tH is alive: " + str(TCPH.is_alive()))
-
-'''
-print("Enumerate: ")
-for e in threading.enumerate():
-    print(e)
-'''
+# a template for Ping msg
 class PingMsg:
-    #newSeq = itertools.count()
-
     def __init__(self, seq, id, flag, myPos):
         #self._seq = next(self.newSeq)
         self._seq = seq
@@ -97,6 +104,7 @@ class PingMsg:
         send_msg = f'header: {header}, msg: {self.msg}'
         return send_msg
 
+# a template for TCP msg
 class TCPMsg:
 
     def __init__(self, id, flag, myPos, msg):
@@ -138,6 +146,45 @@ class TCPMsg:
         send_msg = f'{header} {self.msg}'
         return send_msg
 
+# a template for File msg (both segment and ACK)
+# (seq is None and content is None) when (flag==ACK or flag==FINACK)
+# ACK is None  when (flag==PAYLOAD or flag==FIN)
+class FileSegment:
+    def __init__(self, seq, ack, flag, content, mss):
+        self._seq = seq
+        self._ack = ack
+        self._flag = flag
+        self._content = content
+        self._mss = mss
+    
+    @property
+    def seq(self):
+        return self._seq
+    
+    @property
+    def ack(self):
+        return self._ack
+    
+    @property
+    def flag(self):
+        return self._flag
+    
+    @property
+    def content(self):
+        if self._content is None:
+            return b""
+        else:
+            return self._content
+    
+    @property
+    def mss(self):
+        return self._mss        
+    
+    def __str__(self):
+        msg = f"[File Segment] Seq: {self._seq}, ACK: {self._ack}, Flag: {self._flag}, MSS: {self._mss}\nContent: {self._content}"
+        return msg
+
+# validate file name input, raise Error if file name not valid
 def validateFileName(str):
     try:
         file = str.split()[1]
@@ -156,6 +203,7 @@ def validateFileName(str):
                     raise ValueError('File name must be between 0 and 9999')
                 return file
 
+# check if I have the file
 def checkFile(file):
     global myId, myPrev1, myPrev2
 
@@ -179,26 +227,13 @@ def checkFile(file):
         else:
             return False
 
+# hash function for calculating expected file holder
 def hashFunc(file):
     assert(type(file) is int and file >= 0 and file <= 9999)
     hash = file % 256
     return hash
 
-def generateHeader(protocol, flag=None):
-    global myId, mySucc1, mySucc2, myPrev1, myPrev2
-
-    baseHeader = f'{myId} {myId+50000}'
-
-    if protocol == 'TCP':
-        assert(flag is not None)
-        TCPheader = f'{baseHeader} {flag}'
-        check = TCPheader.split()
-        assert(len(check) == 3)
-        return TCPheader
-
-    elif protocol == 'UDP':
-        return baseHeader
-
+# function to update predecessors
 def updatePrev(srcId, srcPos):
     global myPrev1, myPrev2
 
@@ -210,6 +245,7 @@ def updatePrev(srcId, srcPos):
     else:
         print("fail to update prev")
 
+# function to update successors
 def updateNext(new_Succ1, new_Succ2):
     global mySucc1, mySucc2
 
@@ -227,6 +263,7 @@ def updateNext(new_Succ1, new_Succ2):
     print(f"My first successor is now peer {mySucc1}.")
     print(f"My second successor is now peer {mySucc2}.")
 
+# send TCP Message from random port (by TCP)
 def sendTCPMsg(msg, destId):
     destId = int(destId)
     destPort = 50000 + destId
@@ -234,33 +271,245 @@ def sendTCPMsg(msg, destId):
     try:
         send_socket.connect(('localhost', destPort))
         send_socket.send(msg)
+        
+    # try again if connection refused
     except:
         time.sleep(1)
         send_socket.connect(('localhost', destPort))
         send_socket.send(msg)
     send_socket.close()
 
-def sendUDPMsg(msg, destId):
+# send Ping Message from random Port (by UDP)
+def sendPingMsg(msg, destId):
     global myId, mySucc1, mySucc2, myPrev1, myPrev2
 
     c_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    rand = random.randint(0, 10)
+    rand = random.random()
     if rand >= dropRate:
         destPort = 50000 + destId
         destServer = ('localhost', destPort)
         c_socket.sendto(msg, destServer)
     else:
-        print(f"---------<<PACKET LOST>> dest to {destId}----------\n")
+        print(f"\n---------<<PACKET LOST>> dest to {destId}----------\n")
     c_socket.close()
 
+# send File Segment and ACK from random Port (by UDP)
+def sendFileMsg(msg, destId):
+    global lastSentSeq, lastRecvAck
+    # as assignmetn doesn't specify a port for file transfer, 
+    # make id+50256 be port to receive file msg
+    destPort = int(destId) + 50256
+    c_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    rand = random.random()
+    if rand >= dropRate:
+        destServer = ('localhost', destPort)
+        c_socket.sendto(msg, destServer)
+    else:
+        print(f"\n---------<<File Pkt LOST>> dest to {destId}--------\n")
+        extract = pickle.loads(msg)
+        if IM_SENDER:
+            role = 'sender'
+        if IM_RECEIVER: 
+            role = 'receiver'
+        recordLog(role, 'drop', (time.time()-startTime), extract.seq, len(extract.content), extract.ack)
+
+# function to record log.txt file   
+def recordLog(role, event, time, seq, dataNum, ack):
+
+    if role == 'sender':
+        respondLog_fp = open('responding_log.txt', 'a')
+        respondLog_fp.write(f'{event}\t{time}\t{seq}\t{dataNum}\t{ack}\n')
+        respondLog_fp.close()
+    
+    elif role == 'receiver':
+        requestLog_fp = open('requesting_log.txt', 'a')
+        requestLog_fp.write(f'{event}\t{time}\t{seq}\t{dataNum}\t{ack}\n')
+        requestLog_fp.close()
+        
 '''
 Threading function
 '''
+# thread that handle file transfering. Only start when a file request/response are successfully received
+def FileHandler():
+    global myId, targetFile, MSS, theReceiver, theSender, lastSentSeq, lastRecvAck, lastRecvSeq, lastSentAck, IM_SENDER, IM_RECEIVER, FINISH
+    
+    print(f"Peer {myId}: File Handler thread started")
+    s_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    host = 'localhost'
+    port = 50256 + myId
+    server = (host, port)
+    s_socket.bind(server)
+    
+    lastPkt = None
+    retransmit = 0
+    
+    fileToRead = f'{targetFile}.pdf'
+    fileToWrite = f'received_file.pdf'
+    
+    # send first payload if I'm sender
+    if IM_SENDER and lastSentSeq < 0:
+        print("We now start sending the file ......")
+        try:
+            fp_read = open(fileToRead, 'rb')
+        except:
+            print('No such file')
+        
+        chunk = fp_read.read(MSS)
+        initialSeqNum = random.randint(100, 1000)
+        sendPkt = FileSegment(initialSeqNum, None, PAYLOAD, chunk, MSS)
+        sendFileMsg(pickle.dumps(sendPkt), theReceiver)
+        recordLog('sender', 'Snd', (time.time()-startTime), sendPkt.seq, len(sendPkt.content), sendPkt.ack)
+        print(f'Send pkt: {sendPkt}')
+        
+        lastPkt = sendPkt
+        lastSentSeq = initialSeqNum
 
+    if IM_RECEIVER:
+        print(f"We now start receiving the file ......")
+        fp_write = open(fileToWrite, 'ab')
+        
+    while not FINISH:
+        print('-----------------File Handler thread---------------')
+        # send first payload
+        s_socket.settimeout(1.0)
+        try:
+            recvPkt, addr = s_socket.recvfrom(1024)
+        
+        # resend if timeout
+        except socket.timeout:
+            if IM_SENDER and lastPkt is not None:
+                if retransmit > 4:
+                    print("retransmit 4 times already")
+                    break
+                sendFileMsg(pickle.dumps(lastPkt), theReceiver)
+                print(f"Resend pkt: {lastPkt}")
+                recordLog('sender', 'RTX', (time.time()-startTime), lastPkt.seq, len(lastPkt.content), lastPkt.ack)
+                
+                retransmit += 1
+                continue
+            else: 
+                continue
+        
+        # reset retransmiting time
+        retransmit = 0    
+        # extract information
+        recvPkt = pickle.loads(recvPkt)
+        srcSeq = recvPkt.seq
+        srcAck = recvPkt.ack
+        srcFlag = recvPkt.flag
+        srcContent = recvPkt.content
+        assert(recvPkt.mss == MSS)
+        print('Received:')
+        print(recvPkt)
+        
+        # if the file holder get an ACK, send file payload
+        if srcFlag == ACK:
+            assert(IM_SENDER)
+            recordLog('sender', 'rcv', (time.time()-startTime), srcSeq, 0, srcAck)
+            print("I'm Sender:")
+            
+            # detect duplicate
+            if srcSeq == lastRecvAck:
+                print("Received duplicate, ignore.")
+                pass
+            elif srcAck > lastRecvAck:
+                if srcAck == lastSentSeq:
+                    newSeq = srcAck + 1
+                    lastRecvAck = srcAck
+                    chunk = fp_read.read(MSS)
+                    # if reach the end of the file
+                    if chunk == b'':
+                        print("All data has been read. Send FIN.")
+                        respMsg = FileSegment(newSeq, None, FIN, None, MSS)
+                        
+                    else:
+                        respMsg = FileSegment(newSeq, None, PAYLOAD, chunk, MSS)
+                        
+                    sendFileMsg(pickle.dumps(respMsg), theReceiver)
+                    recordLog('sender', 'Snd', (time.time()-startTime), respMsg.seq, len(respMsg.content), respMsg.ack)
+                    print(f'Send pkt: {respMsg}')
+                    lastSentSeq = newSeq
+                    lastPkt = respMsg
+                else:
+                    print("Received out of order ACK, ignore.")
+                    pass
+            else:
+                print("!!!!!! ERROR: srcACK < lastRecvAck")
+                
+        # if the reqeusting file get a PAYLOAD, load the payload and respond with ACK  
+        elif srcFlag == PAYLOAD:
+            assert(IM_RECEIVER)
+            recordLog('receiver', 'rcv', (time.time()-startTime), srcSeq, len(srcContent), srcAck)
+            print("I'm Receiver: ")
+            
+            # detect duplicate, ignore payload and resend ACK
+            if srcSeq == lastRecvSeq:
+                print("Receive duiplicate, ignore.")
+                respMsg = FileSegment(None, lastRecvSeq, ACK, None, MSS)
+                sendFileMsg(pickle.dumps(respMsg), theSender)
+                recordLog('receiver', 'Snd', (time.time()-startTime), respMsg.seq, len(respMsg.content), respMsg.ack)
+            
+            # receive payload, load chunk and send ACK
+            elif srcSeq > lastRecvSeq:
+                lastRecvSeq = srcSeq
+                newAck = srcSeq
+                
+                fp_write.write(srcContent)
+                respMsg = FileSegment(None, newAck, ACK, None, MSS)
+                sendFileMsg(pickle.dumps(respMsg), theSender)
+                recordLog('receiver', 'Snd', (time.time()-startTime), respMsg.seq, len(respMsg.content), respMsg.ack)
+                print(f'Send pkt: {respMsg}')
+                
+            else: 
+                print("!!!!!! ERROR: srcSeq < lastRecvSeq")
+                
+        # if all data has been transfered and sender send FIN to receiver
+        elif srcFlag == FIN:
+            assert(IM_RECEIVER)
+            recordLog('receiver', 'rcv', (time.time()-startTime), srcSeq, len(srcContent), srcAck)
+            print("I'm Receiver: ")
+            print("All data has finished transfering, send back FINACK")
+            
+            lastRecvSeq = srcSeq
+            newAck = srcSeq
+            respMsg = FileSegment(None, newAck, FINACK, None, MSS)
+            sendFileMsg(pickle.dumps(respMsg), theSender)
+            lastPkt = respMsg
+            recordLog('receiver', 'Snd', (time.time()-startTime), respMsg.seq, len(respMsg.content), respMsg.ack)
+            break
+        
+        # sender received a FINACK
+        elif srcFlag == FINACK:
+            assert(IM_SENDER)
+            recordLog('sender', 'rcv', (time.time() - startTime), srcSeq, len(srcContent), srcAck)
+            print("I'm Sender: ")
+            print("Get FINACK")
+            break
+        
+        else: 
+            print("!!!!! ERROR: Fail to identify file Segment flag")
+            
+        print("\nSummary:")
+        if (IM_SENDER):
+            print(f"theReceiver: {theReceiver}, lastSentSeq: {lastSentSeq}, lastRecvAck: {lastRecvAck}")
+        elif (IM_RECEIVER):
+            print(f"theSender: {theSender}, lastRecvSeq: {lastRecvSeq}, lastSentAck: {lastSentAck}")
+        print('------------------------------------------')
+
+    if IM_SENDER:
+        print("The file is sent.")
+        fp_read.close()
+    elif IM_RECEIVER:
+        print("The file is received.")
+        fp_write.close()
+        
+    print("File Handler exiting...")
+    s_socket.close()
+
+# thread that pings successors every 30 seconds
 def pingSender():
     global myId, mySucc1, mySucc2, myPrev1, myPrev2, FINISH
     print("UDP Sender thread: start sending ping")
-    logging.debug('running with %s', myId)
     seqNum = 0
 
     while not FINISH:
@@ -274,20 +523,20 @@ def pingSender():
 
             sendPing = PingMsg(seqNum, myId, 'REQUEST', myPos)
             send_data = pickle.dumps(sendPing)
-            sendUDPMsg(send_data, s)
+            sendPingMsg(send_data, s)
             print(f'------------Sending Ping to Peer {s}------------\n')
 
         seqNum += 1
-        time.sleep(10)
+        time.sleep(30)
     
 
     print("pingSender exiting...")
 
+# thread that listen for UDP Msg, check FINISH flag every 10 second
 def UDPListener():
-    global myId, mySucc1, mySucc2, myPrev1, myPrev2, FINISH
+    global myId, mySucc1, mySucc2, myPrev1, myPrev2, MSS, FINISH
     lastPing = {'Succ1': 0, 'Succ2': 0}
     print('UDP Listener thread: UDP server with id ' + str(myId) + ' started')
-    logging.debug('running with %s', myId)
 
     s_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     host = 'localhost'
@@ -300,18 +549,20 @@ def UDPListener():
         # check FINISH condition every 10 sec
         s_socket.settimeout(10.0)
         try:
-            recvPing, addr = s_socket.recvfrom(1024)
+            recvPkt, addr = s_socket.recvfrom(1024)
         except socket.timeout:
             continue
         
         s_socket.settimeout(None)
-        recvPing = pickle.loads(recvPing)
+        recvPkt = pickle.loads(recvPkt)
+
+        print('------------UDP Listener thread----------')
+        
+        recvPing = recvPkt
         recvMsg = recvPing.msg
         srcId = recvPing.id
         flag = recvPing.flag
         srcPos = recvPing.myPos
-
-        print('------------UDP Listener thread----------')
 
         if flag == 'RESPONSE':
             lastPing[recvPing.myPos] = recvPing.seq
@@ -333,7 +584,6 @@ def UDPListener():
                 # balance last ping to avoid further change
                 lastPing['Succ1'] = lastPing['Succ2']
                 
-
         elif flag == 'REQUEST':
             print(recvMsg)
             print(f'received from Peer {srcId}, which is my {srcPos}')
@@ -348,20 +598,19 @@ def UDPListener():
             elif srcPos == 'Prev2':
                 respPing.myPos = 'Succ2'
             respPing.id = myId
-            sendUDPMsg(pickle.dumps(respPing), srcId)
+            sendPingMsg(pickle.dumps(respPing), srcId)
 
         print(f'lastPing: {lastPing}')
-
         print('--------------------------------------\n')
-        #time.sleep(7)
+            
     print("UDPListener exiting...")
     s_socket.close()
 
+# thread that listen for TCP Msg, check FINISH flag every 10 second
 def TCPHandler():
-    global myId, mySucc1, mySucc2, myPrev1, myPrev2, FINISH
+    global myId, mySucc1, mySucc2, myPrev1, myPrev2, MSS, IM_SENDER, IM_RECEIVER, theSender, theReceiver, targetFile, FINISH
 
     print(f'TCP handler thread with id {myId}: Start listening')
-    logging.debug('running with %s', myId)
 
     # create socket
     listen_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -371,7 +620,7 @@ def TCPHandler():
         # check FINISH condition every 10 sec
         listen_socket.settimeout(10.0)
         try:
-            print('=============TCP Handler retry============')
+            print('=============TCP Handler re-check FINISH flag============')
             listen_socket.listen(1)
             conn, addr = listen_socket.accept()
             # connection socket
@@ -403,24 +652,44 @@ def TCPHandler():
             print(f"Looking for file {fileName}")
             # if self has the file, connect and send response directly to requesting peer
             if has:
-                msg = f'{file} {fileName}'
-                respData = TCPMsg(myId, FILE_RESPONSE, None, msg)
-                sendTCPMsg(pickle.dumps(respData), srcId)
-                print(f"File {fileName} is stored here.\nA response message, destined for peer {srcId}, has been sent.")
-
+                try:
+                    fp = open(f'{fileName}.pdf', 'r')
+                except:
+                    print("!!!!!! Error: Sorry, the file is not exist")
+                else:        
+                    msg = f'{file} {fileName}'
+                    respData = TCPMsg(myId, FILE_RESPONSE, None, msg)
+                    sendTCPMsg(pickle.dumps(respData), srcId)
+                    print(f"File {fileName} is stored here.\nA response message, destined for peer {srcId}, has been sent.")
+                    # wait for file holder get FILE_RESPONSE and open file listener port
+                    # time.sleep(1)
+                    # start sending file
+                    IM_SENDER = True
+                    theReceiver = srcId
+                    targetFile = fileName
+                    tFileHandler.start()
+                
             # if self doesn't has file, connect and send request next peer
             elif not has:
                 print(f"File {fileName} is not stored here.")
                 sendTCPMsg(pickle.dumps(recvData), mySucc1)
                 print("File request message has been forwarded to my successor.")
-
-        # when the file holder send back response to requesting peer
+                
+        # when receives file holder's response to requesting peer
         elif srcFlag is FILE_RESPONSE:
             file = int(srcMsg.split()[0])
             fileName = srcMsg.split()[1]
             respondingPeer = srcId
-            print(f"Received a response message from peer {respondingPeer}, which has the file {fileName}.")
-
+            print(f"Received a resposnse message from peer {respondingPeer}, which has the file {fileName}.")
+            IM_RECEIVER = True
+            theSender = respondingPeer
+            targetFile = fileName
+            # start receiving files
+            try:
+                tFileHandler.start()
+            except:
+                pass
+           
         # when the peer is leaving
         elif srcFlag is QUIT_NOTIFY:
             msg = srcMsg.split()
@@ -436,7 +705,6 @@ def TCPHandler():
             # if leaving peer is mySucc2, only update mySucc2
             elif leavingPeer == 'Succ2':
                 updateNext(None, new_Succ1)
-
 
             depart_msg = ' '.join(msg[2:])
             print(depart_msg)
@@ -481,18 +749,18 @@ def TCPHandler():
     listen_socket.close()
 
 # initialise threads
-# tInputMonitor = threading.Thread(target=inputMonitor)
 tpingSender = threading.Thread(target=pingSender)
 tUDPListener = threading.Thread(target=UDPListener)
 tTCPHandeler = threading.Thread(target=TCPHandler)
+tFileHandler = threading.Thread(target=FileHandler)
 
 # start all threads
-# tInputMonitor.start()
-time.sleep(3)
+time.sleep(2)
 tpingSender.start()
 tUDPListener.start()
 tTCPHandeler.start()
 
+# Input monitor, handleing 'request' and 'quit. Ignore if input is invalid
 while(True):
     try:
         s = input()
@@ -543,6 +811,5 @@ while(True):
 
             else:
                 print('try again')
-
 
 print("\n--------all thread ended--------")
