@@ -1,17 +1,22 @@
 import time
 import random
 import socket
+import pickle, itertools
 import threading
 import sys
 import logging
+import time
+import copy
 
 logging.basicConfig(level=logging.DEBUG,
                     format='(%(threadName)-10s) %(message)s',
                     )
 
-FILE_REQUEST = 2
-FILE_RESPONSE = 1
-QUIT_NOTIFY = 3
+FILE_REQUEST = 2        # requesting a file
+FILE_RESPONSE = 1       # responding to requesting peer that I have the file
+QUIT_NOTIFY = 3         # notifying others that I'm leaving
+INFO_REQUEST = 4        # requesting my successors infomation
+INFO_RESPONSE = 5       # response to INFO_REQUEST
 INVALID = -1
 FINISH = False
 
@@ -34,12 +39,105 @@ print('set up peer with id ' + sys.argv[1])
 # print("pS is alive: " + str(UDPS.is_alive()))
 # print("tH is alive: " + str(TCPH.is_alive()))
 
-
 '''
 print("Enumerate: ")
 for e in threading.enumerate():
     print(e)
 '''
+class PingMsg:
+    #newSeq = itertools.count()
+
+    def __init__(self, seq, id, flag, myPos):
+        #self._seq = next(self.newSeq)
+        self._seq = seq
+        self._id = id
+        self._flag = flag
+        self._myPos = myPos
+
+    @property
+    def seq(self):
+        return self._seq
+
+    @property
+    def id(self):
+        return self._id
+
+    @property
+    def flag(self):
+        return self._flag
+
+    @property
+    def myPos(self):
+        return self._myPos
+
+    @property
+    def msg(self):
+        if (self.flag == 'REQUEST'):
+            msg = f"A ping request was received from Peer {self._id}."
+        elif (self.flag == 'RESPONSE'):
+            msg = f"A ping response message was received from Peer {self._id}."
+        else:
+            msg = None
+        return msg
+
+    @flag.setter
+    def flag(self, flag):
+        self._flag = flag
+
+    @myPos.setter
+    def myPos(self, pos):
+        self._myPos = pos
+
+    @id.setter
+    def id(self,id):
+        self._id = id
+
+    def __str__(self):
+        header = f'{self._seq} {self._id} {self._id+50000} {self._flag} {self._myPos}'
+        send_msg = f'header: {header}, msg: {self.msg}'
+        return send_msg
+
+class TCPMsg:
+
+    def __init__(self, id, flag, myPos, msg):
+        self._id = id
+        self._flag = flag
+        self._myPos = myPos
+        self._msg = msg
+
+    @property
+    def id(self):
+        return self._id
+
+    @property
+    def flag(self):
+        return self._flag
+
+    @property
+    def myPos(self):
+        return self._myPos
+
+    @property
+    def msg(self):
+        return self._msg
+
+    @flag.setter
+    def flag(self, flag):
+        self._flag = flag
+
+    @myPos.setter
+    def myPos(self, pos):
+        self._myPos = pos
+
+    @id.setter
+    def id(self, id):
+        self._id = id
+
+    def __str__(self):
+        header = f'{self._id} {self._id+50000} {self._flag} {self._myPos}'
+        send_msg = f'{header} {self.msg}'
+        return send_msg
+
 def validateFileName(str):
     try:
         file = str.split()[1]
@@ -55,20 +153,19 @@ def validateFileName(str):
                 raise ValueError('File name must be integer')
             else:
                 if (file < 0 or file > 9999):
-                    raise ValueError(
-                        'File name must be between 0 and 9999')
+                    raise ValueError('File name must be between 0 and 9999')
                 return file
 
 def checkFile(file):
     global myId, myPrev1, myPrev2
-    
+
     assert(type(file) is int and file >= 0 and file <= 9999)
     expectedPeer = hashFunc(file)
     assert(type(expectedPeer) is int)
-    
+
     if myId == expectedPeer:
         return True
-    
+
     elif myId > myPrev1 or myId > myPrev2:
         if (myId >= expectedPeer) and ((myPrev1 < expectedPeer) or (myPrev2 < expectedPeer)):
             return True
@@ -77,9 +174,9 @@ def checkFile(file):
 
     # if I'm the first peer in the dht
     elif myId < myPrev1 and myId < myPrev2:
-        if myId >= expectedPeer:
+        if myId >= expectedPeer or (expectedPeer > myPrev1) :
             return True
-        else: 
+        else:
             return False
 
 def hashFunc(file):
@@ -87,17 +184,9 @@ def hashFunc(file):
     hash = file % 256
     return hash
 
-def extractHeader(protocol, msg):
-    msg = msg.split()
-    headerSize = 3
-
-    header = msg[0:headerSize]
-    msg = ' '.join(msg[headerSize:])
-    return (header, msg)
-
 def generateHeader(protocol, flag=None):
     global myId, mySucc1, mySucc2, myPrev1, myPrev2
-    
+
     baseHeader = f'{myId} {myId+50000}'
 
     if protocol == 'TCP':
@@ -112,7 +201,7 @@ def generateHeader(protocol, flag=None):
 
 def updatePrev(srcId, srcPos):
     global myPrev1, myPrev2
-    
+
     assert(type(srcId) is int)
     if srcPos == 'Prev1':
         myPrev1 = srcId
@@ -120,127 +209,86 @@ def updatePrev(srcId, srcPos):
         myPrev2 = srcId
     else:
         print("fail to update prev")
-                
+
 def updateNext(new_Succ1, new_Succ2):
     global mySucc1, mySucc2
-    
+
     if new_Succ1 is None:
         assert(type(new_Succ2) is int)
         mySucc2 = new_Succ2
-        
+
     elif new_Succ2 is None:
         assert(type(new_Succ1) is int)
         mySucc1 = new_Succ1
-        
+
     else:
         mySucc1 = new_Succ1
         mySucc2 = new_Succ2
     print(f"My first successor is now peer {mySucc1}.")
     print(f"My second successor is now peer {mySucc2}.")
 
-def notifyDepart(id):
-    print(f'Peer {id} will depart from the network.')
-
-
-def sendTCPMsg(msg, destPort):
-    destPort = int(destPort)
+def sendTCPMsg(msg, destId):
+    destId = int(destId)
+    destPort = 50000 + destId
     send_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    send_socket.connect(('localhost', destPort))
-    send_socket.send(msg.encode('utf-8'))
+    try:
+        send_socket.connect(('localhost', destPort))
+        send_socket.send(msg)
+    except:
+        time.sleep(1)
+        send_socket.connect(('localhost', destPort))
+        send_socket.send(msg)
     send_socket.close()
 
+def sendUDPMsg(msg, destId):
+    global myId, mySucc1, mySucc2, myPrev1, myPrev2
+
+    c_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    rand = random.randint(0, 10)
+    if rand >= dropRate:
+        destPort = 50000 + destId
+        destServer = ('localhost', destPort)
+        c_socket.sendto(msg, destServer)
+    else:
+        print(f"---------<<PACKET LOST>> dest to {destId}----------\n")
+    c_socket.close()
 
 '''
 Threading function
 '''
-def inputMonitor():
+
+def pingSender():
     global myId, mySucc1, mySucc2, myPrev1, myPrev2, FINISH
-
-    while(True):
-        if FINISH:
-            print("inputMonitor exiting...")
-            break
-        
-        s = input()
-        print("get input " + s)
-        try:
-            flag = s.split()[0]
-            print(f"flag is: {flag}")
-        except:
-            print('invalid')
-            continue
-        else:
-            if flag == 'request':
-                try:
-                    file = validateFileName(s)
-                except ValueError as er:
-                    print(er)
-                    continue
-                else:
-                    print(f'successfully validate file {file}')
-                    selfPort = 50000+int(myId)
-                    print(f'preparing to send to {selfPort}')
-                    TCPheader = generateHeader('TCP',FILE_REQUEST)
-                    msg = TCPheader + f' {file}'
-                    print(f'msg: {msg}')
-                    sendTCPMsg(msg, selfPort)
-                    print(f'successfully send to port {selfPort}')
-
-            elif flag == 'quit':
-                    TCPheader = generateHeader('TCP',QUIT_NOTIFY)
-                    mySuccessors = f'{mySucc1} {mySucc2}'
-                    prev_port = 50000+myPrev1
-                    secPrev_port = 50000+myPrev2
-
-                    msg = f'{TCPheader} {mySuccessors} Peer {myId} will depart from the network.'
-                    sendTCPMsg(msg, prev_port)
-                    sendTCPMsg(msg, secPrev_port)
-                    FINISH = True
-                    sys.exit()
-            else:
-                print('try again')
-
-def UDPSender():
-    global myId, mySucc1, mySucc2, myPrev1, myPrev2, FINISH
-
     print("UDP Sender thread: start sending ping")
     logging.debug('running with %s', myId)
-    while True:
-        if FINISH:
-            print("UDPSender exiting...")
-            break
-        sendMsg = "A ping request message was received from Peer " + \
-            str(myId)
-        c_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        UDPheader = generateHeader('UDP')
+    seqNum = 0
+
+    while not FINISH:
         for s in [mySucc1, mySucc2]:
             if s is mySucc1:
                 myPos = 'Prev1'
             elif s is mySucc2:
                 myPos = 'Prev2'
-            else: 
-                raise Exception
-            sendMsg = f'{UDPheader} {myPos} [UDP client {s}] A ping request was received from Peer {myId}.'
-            rand = random.randint(0, 10)
-            if rand >= dropRate:
-                server = ('localhost', (50000+s))
-                c_socket.sendto(sendMsg.encode('utf-8'), server)
-            c_socket.settimeout(3.0)
-            try:
-                data, serverAddr = c_socket.recvfrom(1024)
-            except socket.timeout:
-                print(f"Sender thread: <PACKET LOST> to Peer {s}")
             else:
-                print(f"Sender thread: {data.decode('utf-8')}")
-        c_socket.close()
-        time.sleep(30)
+                raise Exception
+
+            sendPing = PingMsg(seqNum, myId, 'REQUEST', myPos)
+            send_data = pickle.dumps(sendPing)
+            sendUDPMsg(send_data, s)
+            print(f'------------Sending Ping to Peer {s}------------\n')
+
+        seqNum += 1
+        time.sleep(10)
+    
+
+    print("pingSender exiting...")
 
 def UDPListener():
     global myId, mySucc1, mySucc2, myPrev1, myPrev2, FINISH
-
+    lastPing = {'Succ1': 0, 'Succ2': 0}
     print('UDP Listener thread: UDP server with id ' + str(myId) + ' started')
     logging.debug('running with %s', myId)
-    
+
     s_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     host = 'localhost'
     port = 50000 + myId
@@ -248,32 +296,69 @@ def UDPListener():
     # bind a socket for UDP listener
     s_socket.bind(server)
 
-    
-    while True:
-        if FINISH:
-            print("UDPListener exiting...")
-            break
+    while not FINISH:
+        # check FINISH condition every 10 sec
+        s_socket.settimeout(10.0)
+        try:
+            recvPing, addr = s_socket.recvfrom(1024)
+        except socket.timeout:
+            continue
         
-        recvMsg, srcAddr = s_socket.recvfrom(1024)
-        recvMsg = recvMsg.decode('utf-8')
-        header, msg = extractHeader('UDP', recvMsg)
-        srcId = int(header[0])
-        # srcPort = int(recvMsg[1])
-        # srcAddr = ('localhost', srcPort)
-        print('Listener thread: [UDP server ' +
-                str(myId) + ']' + 'received msg: ' + msg)
-        if "response" in recvMsg:
-            pass
-        elif "request" in recvMsg:
-            srcPos = header[2]
-            print(f'Listener thread: received from Peer {srcId}, which is my {srcPos}')
+        s_socket.settimeout(None)
+        recvPing = pickle.loads(recvPing)
+        recvMsg = recvPing.msg
+        srcId = recvPing.id
+        flag = recvPing.flag
+        srcPos = recvPing.myPos
+
+        print('------------UDP Listener thread----------')
+
+        if flag == 'RESPONSE':
+            lastPing[recvPing.myPos] = recvPing.seq
+            print(recvMsg)
+            
+            # Succ2 died, request info from Succ1
+            if lastPing['Succ1'] - lastPing['Succ2'] > 4:
+                print(f"Peer {mySucc2} is no longer alive.")
+                sendData = TCPMsg(myId, INFO_REQUEST, 'Prev1', mySucc2)
+                sendTCPMsg(pickle.dumps(sendData), mySucc1)
+                # balance last ping to avoid further change
+                lastPing['Succ2'] = lastPing['Succ1']
+                
+            # Succ1 died, request info from Succ2
+            if lastPing['Succ2'] - lastPing['Succ1'] > 4:
+                print(f'Peer {mySucc1} is no longer alive.')
+                sendData = TCPMsg(myId, INFO_REQUEST, 'Prev2', mySucc1)
+                sendTCPMsg(pickle.dumps(sendData), mySucc2)
+                # balance last ping to avoid further change
+                lastPing['Succ1'] = lastPing['Succ2']
+                
+
+        elif flag == 'REQUEST':
+            print(recvMsg)
+            print(f'received from Peer {srcId}, which is my {srcPos}')
+
             updatePrev(srcId, srcPos)
-            print(f"Peer {myId}: [Prev: {myPrev1}] [nextPrev: {myPrev2}]")
-            sendMsg = f"A ping response message was received from Peer {myId}."
-            s_socket.sendto(sendMsg.encode('utf-8'), srcAddr)
+            print(f"Peer {myId}: [Prev1: {myPrev1}] [Prev2: {myPrev2}]")
+            print(f"Peer {myId}: [Succ1: {mySucc1}] [Succ2: {mySucc2}]")
+            respPing = copy.deepcopy(recvPing)
+            respPing.flag = 'RESPONSE'
+            if srcPos == 'Prev1':
+                respPing.myPos = 'Succ1'
+            elif srcPos == 'Prev2':
+                respPing.myPos = 'Succ2'
+            respPing.id = myId
+            sendUDPMsg(pickle.dumps(respPing), srcId)
+
+        print(f'lastPing: {lastPing}')
+
+        print('--------------------------------------\n')
+        #time.sleep(7)
+    print("UDPListener exiting...")
+    s_socket.close()
 
 def TCPHandler():
-    global myId, mySucc1, mySucc2, myPrev1, myPrev2,FINISH
+    global myId, mySucc1, mySucc2, myPrev1, myPrev2, FINISH
 
     print(f'TCP handler thread with id {myId}: Start listening')
     logging.debug('running with %s', myId)
@@ -282,98 +367,142 @@ def TCPHandler():
     listen_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     listen_socket.bind(('localhost', 50000+myId))
 
-    while(True):
-        if FINISH:
-            print("TCPHandler exiting...")
-            listen_socket.close()
-            break
-        listen_socket.listen(1)
-        # connection socket
-        conn, addr = listen_socket.accept()
-        print(
-            f'TCP handler thread widh id {myId}: Connection from {addr}')
+    while not FINISH:
+        # check FINISH condition every 10 sec
+        listen_socket.settimeout(10.0)
+        try:
+            print('=============TCP Handler retry============')
+            listen_socket.listen(1)
+            conn, addr = listen_socket.accept()
+            # connection socket
+        except socket.timeout:
+            continue
+        
+        listen_socket.settimeout(None)
+        print('--------------TCP Handler thread----------------')
+
+        print(f'Peer {myId}: Connection from {addr}')
         # receive data from connection socket
-        data = conn.recv(1024).decode('utf-8')
-        print(f'TCP handler thread with id {myId}: received "{data}"')
-        header, recvMsg = extractHeader("TCP", data)
-        print(f'TCP handler received data: {data}')
-        print(f'TCP handler received header: {header}')
-        print(f'TCP handler received recvMsg: {recvMsg}')
-        msgType = int(header[2])
+        recvData = pickle.loads(conn.recv(1024))
+        print(f'received "{str(recvData)}"')
+        srcId = recvData.id
+        srcFlag = recvData.flag
+        srcPos = recvData.myPos
+        srcMsg = recvData.msg
+        print(f'received Peer: {srcId}')
+        print(f'received flag: {srcFlag}')
+        print(f'received position: {srcPos}')
+        print(f'received msg: {srcMsg}')
+
         # sending/forwarding reqeust for file
-        if msgType is FILE_REQUEST:
-            file = int(recvMsg.split()[0])
+        if srcFlag is FILE_REQUEST:
+            file = int(srcMsg.split()[0])
+            fileName = srcMsg.split()[1]
             # extract file name
             has = checkFile(file)
-            print(f"Lookingfor file {file}")
+            print(f"Looking for file {fileName}")
             # if self has the file, connect and send response directly to requesting peer
             if has:
-                requestingPeer = header[0]
-                requestingPort = header[1]
-                TCPheader = generateHeader('TCP', FILE_RESPONSE)
-                msg = f'{TCPheader} {file}'
-                sendTCPMsg(msg, requestingPort)
-                print(
-                    f"TCP handler: File {file} is stored here.\nA response message, destined for peer {requestingPeer}, has been sent.")
+                msg = f'{file} {fileName}'
+                respData = TCPMsg(myId, FILE_RESPONSE, None, msg)
+                sendTCPMsg(pickle.dumps(respData), srcId)
+                print(f"File {fileName} is stored here.\nA response message, destined for peer {srcId}, has been sent.")
 
             # if self doesn't has file, connect and send request next peer
             elif not has:
-                print(f"TCP handler: File {file} is not stored here.")
-                nextPort = mySucc1 + 50000
-                msg = ' '.join(header) + f' {file}'
-                sendTCPMsg(msg, nextPort)
-                print(
-                    "TCP handler: File request message has been forwarded to my successor.")
+                print(f"File {fileName} is not stored here.")
+                sendTCPMsg(pickle.dumps(recvData), mySucc1)
+                print("File request message has been forwarded to my successor.")
 
         # when the file holder send back response to requesting peer
-        elif msgType is FILE_RESPONSE:
-            file = int(recvMsg.split()[0])
-            respondingPeer = header[0]
-            print(
-                f"TCP handler: Received a response message from peer {respondingPeer}, which has the file {file}.")
+        elif srcFlag is FILE_RESPONSE:
+            file = int(srcMsg.split()[0])
+            fileName = srcMsg.split()[1]
+            respondingPeer = srcId
+            print(f"Received a response message from peer {respondingPeer}, which has the file {fileName}.")
 
         # when the peer is leaving
-        elif msgType is QUIT_NOTIFY:
-            recvMsg = recvMsg.split()
-            leavingPeer = int(header[0])
-            assert(len(recvMsg) > 2)
-            
-            if leavingPeer == mySucc1:
-                new_Succ1 = int(recvMsg[0])
-                new_Succ2 = int(recvMsg[1])
-                
-            elif leavingPeer == mySucc2:
-                new_Succ1 = None
-                new_Succ2 = int(recvMsg[0])
-                
-            print(f"My new Succ1 should be: {new_Succ1}, new Succ2 should be: {new_Succ2}")    
-            updateNext(new_Succ1, new_Succ2)
-            
-            depart_msg = ' '.join(recvMsg[2:])
+        elif srcFlag is QUIT_NOTIFY:
+            msg = srcMsg.split()
+            leavingPeer = recvData.myPos
+            assert(len(msg) >= 2)
+            new_Succ1 = int(msg[0])
+            new_Succ2 = int(msg[1])
+
+            # if leaving peer is mySucc1, update both
+            if leavingPeer == 'Succ1':
+                updateNext(new_Succ1, new_Succ2)
+
+            # if leaving peer is mySucc2, only update mySucc2
+            elif leavingPeer == 'Succ2':
+                updateNext(None, new_Succ1)
+
+
+            depart_msg = ' '.join(msg[2:])
             print(depart_msg)
-            
+
+        # when someone is dead and its predecessor requesting for my info
+        elif srcFlag is INFO_REQUEST:
+            assert (srcMsg is not None)
+            deadPeer = int(srcMsg)
+            # if the dead peer still in my successors, ignore
+            if (srcId == myPrev1) and (deadPeer in [mySucc1, mySucc2]):
+                pass
+            else:
+                mySuccessors = f'{mySucc1} {mySucc2}'
+                if srcPos == 'Prev1':
+                    myPos = 'Succ1'
+                elif srcPos == 'Prev2':
+                    myPos = 'Succ2'
+
+                sendData = TCPMsg(myId, INFO_RESPONSE, myPos, mySuccessors)
+                sendTCPMsg(pickle.dumps(sendData), srcId)
+
+        # when a peer respond to my INFO_REQUEST, update my Succ
+        elif srcFlag is INFO_RESPONSE:
+            print('============get INFO_RESPONSE==========')
+            new_Succ1 = int(srcMsg.split()[0])
+            new_Succ2 = int(srcMsg.split()[1])
+
+            # if responding peer is mySucc1, make its Succ1 be mySucc2
+            if srcPos == 'Succ1':
+                print('Updating Succ1...')
+                updateNext(None, new_Succ1)
+
+            # if responding peer is mySucc2, make it mySucc1 and make its Succ1 be mySucc2
+            elif srcPos == 'Succ2':
+                print('Updating Succ2...')
+                updateNext(mySucc2, new_Succ1)
 
         conn.close()
+        print("-------------------------------------\n")
+
+    print("TCPHandler exiting...")
+    listen_socket.close()
 
 # initialise threads
 # tInputMonitor = threading.Thread(target=inputMonitor)
-tUDPSender = threading.Thread(target=UDPSender)
+tpingSender = threading.Thread(target=pingSender)
 tUDPListener = threading.Thread(target=UDPListener)
 tTCPHandeler = threading.Thread(target=TCPHandler)
 
 # start all threads
 # tInputMonitor.start()
-tUDPSender.start()
+time.sleep(3)
+tpingSender.start()
 tUDPListener.start()
 tTCPHandeler.start()
 
 while(True):
-        if FINISH:
-            print("inputMonitor exiting...")
-            break
-
+    try:
         s = input()
         print("get input " + s)
+    except KeyboardInterrupt:
+        FINISH = True
+        for t in [tpingSender, tUDPListener, tTCPHandeler]:
+            t.join()
+        break
+    else:
         try:
             flag = s.split()[0]
             print(f"flag is: {flag}")
@@ -383,31 +512,37 @@ while(True):
         else:
             if flag == 'request':
                 try:
+                    fileName = s.split()[1]
                     file = validateFileName(s)
-                except ValueError as er:
+                except (IndexError, ValueError) as er:
                     print(er)
                     continue
                 else:
-                    print(f'successfully validate file {file}')
-                    selfPort = 50000+int(myId)
-                    print(f'preparing to send to {selfPort}')
-                    TCPheader = generateHeader('TCP', FILE_REQUEST)
-                    msg = TCPheader + f' {file}'
-                    print(f'msg: {msg}')
-                    sendTCPMsg(msg, selfPort)
-                    print(f'successfully send to port {selfPort}')
+                    print(f'successfully validate file {fileName}')
+                    print(f'preparing to send to {myId}')
+                    sendData = TCPMsg(myId, FILE_REQUEST, None, f'{file} {fileName}')
+                    print(f'sendData: {sendData}')
+                    sendTCPMsg(pickle.dumps(sendData), myId)
+                    print(f'successfully send to Peer {myId}')
 
             elif flag == 'quit':
-                    TCPheader = generateHeader('TCP', QUIT_NOTIFY)
                     mySuccessors = f'{mySucc1} {mySucc2}'
-                    prev_port = 50000+myPrev1
-                    secPrev_port = 50000+myPrev2
+                    msg = f'{mySuccessors} Peer {myId} will depart from the network.'
+                    sendData_toPrev1 = TCPMsg(myId, QUIT_NOTIFY, 'Succ1', msg)
+                    sendData_toPrev2 = TCPMsg(myId, QUIT_NOTIFY, 'Succ2', msg)
 
-                    msg = f'{TCPheader} {mySuccessors} Peer {myId} will depart from the network.'
-                    sendTCPMsg(msg, prev_port)
-                    sendTCPMsg(msg, secPrev_port)
+                    sendTCPMsg(pickle.dumps(sendData_toPrev1), myPrev1)
+                    sendTCPMsg(pickle.dumps(sendData_toPrev2), myPrev2)
+
+                    print("\n----time to kill myself-----")
                     FINISH = True
-                    sys.exit()
+                    time.sleep(1)
+                    for t in [tpingSender, tUDPListener, tTCPHandeler]:
+                        t.join()
+                    break
+
             else:
                 print('try again')
-print("thread killed")
+
+
+print("\n--------all thread ended--------")
