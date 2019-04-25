@@ -55,7 +55,6 @@ print(f'Seting up peer with id {myId}...')
 # a template for Ping msg
 class PingMsg:
     def __init__(self, seq, id, flag, myPos):
-        #self._seq = next(self.newSeq)
         self._seq = seq
         self._id = id
         self._flag = flag
@@ -467,8 +466,7 @@ def FileHandler():
         elif srcFlag == FIN:
             assert(IM_RECEIVER)
             recordLog('receiver', 'rcv', (time.time()-startTime), srcSeq, len(srcContent), srcAck)
-            # print("I'm Receiver: ")
-            print("All data has finished transfering, send back FINACK")
+            # print("All data has finished transfering, send back FINACK")
 
             lastRecvSeq = srcSeq
             newAck = srcSeq
@@ -482,8 +480,7 @@ def FileHandler():
         elif srcFlag == FINACK:
             assert(IM_SENDER)
             recordLog('sender', 'rcv', (time.time() - startTime), srcSeq, len(srcContent), srcAck)
-            #print("I'm Sender: ")
-            print("Get FINACK")
+            # print("Get FINACK")
             break
 
         else:
@@ -502,7 +499,7 @@ def FileHandler():
     print("File Handler exiting...")
     s_socket.close()
 
-# thread that pings successors every 30 seconds
+# thread that pings successors every 40 seconds
 def pingSender():
     global myId, mySucc1, mySucc2, myPrev1, myPrev2, FINISH
     print("UDP Sender thread: start sending ping")
@@ -551,7 +548,7 @@ def pingListener():
         s_socket.settimeout(None)
         recvPkt = pickle.loads(recvPkt)
 
-        print('------------UDP Listener thread----------')
+        #rint('------------UDP Listener thread----------')
 
         recvPing = recvPkt
         recvMsg = recvPing.msg
@@ -564,18 +561,19 @@ def pingListener():
             print(recvMsg)
 
             # Succ2 died, request info from Succ1
-            if lastPing['Succ1'] - lastPing['Succ2'] > 4:
+            if lastPing['Succ1'] - lastPing['Succ2'] > 5:
                 print(f"Peer {mySucc2} is no longer alive.")
                 sendData = TCPMsg(myId, INFO_REQUEST, 'Prev1', mySucc2)
                 sendTCPMsg(pickle.dumps(sendData), mySucc1)
 
+                # balance last ping to avoid further change
+                lastPing['Succ2'] += 2
+
             # Succ1 died, request info from Succ2
-            if lastPing['Succ2'] - lastPing['Succ1'] > 4:
+            if lastPing['Succ2'] - lastPing['Succ1'] > 5:
                 print(f'Peer {mySucc1} is no longer alive.')
                 sendData = TCPMsg(myId, INFO_REQUEST, 'Prev2', mySucc1)
                 sendTCPMsg(pickle.dumps(sendData), mySucc2)
-                # balance last ping to avoid further change
-                lastPing['Succ1'] = lastPing['Succ2'] - 1
 
         elif flag == 'REQUEST':
             print(recvMsg)
@@ -594,7 +592,7 @@ def pingListener():
         print(f"\nPeer {myId}: [Prev1: {myPrev1}] [Prev2: {myPrev2}]")
         print(f"Peer {myId}: [Succ1: {mySucc1}] [Succ2: {mySucc2}]")
         print(f'lastPing: {lastPing}')
-        print('--------------------------------------\n')
+        #print('--------------------------------------\n')
 
     print("pingListener exiting...")
     s_socket.close()
@@ -620,12 +618,9 @@ def TCPHandler():
             continue
 
         listen_socket.settimeout(None)
-        print('--------------TCP Handler thread----------------')
 
-        # print(f'Peer {myId}: Connection from {addr}')
         # receive data from connection socket
         recvData = pickle.loads(conn.recv(1024))
-        # print(f'received "{str(recvData)}"')
         srcId = recvData.id
         srcFlag = recvData.flag
         srcPos = recvData.myPos
@@ -717,7 +712,6 @@ def TCPHandler():
 
         # when a peer respond to my INFO_REQUEST, update my Succ
         elif srcFlag is INFO_RESPONSE:
-            print('============get INFO_RESPONSE==========')
             new_Succ1 = int(srcMsg.split()[0])
             new_Succ2 = int(srcMsg.split()[1])
 
@@ -745,8 +739,8 @@ tFileHandler = threading.Thread(target=FileHandler)
 
 # start all threads
 time.sleep(2)
-tpingSender.start()
 tpingListener.start()
+tpingSender.start()
 tTCPHandeler.start()
 
 # Input monitor, handleing 'request' and 'quit. Ignore if input is invalid
