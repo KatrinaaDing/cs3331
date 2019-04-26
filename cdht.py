@@ -101,7 +101,7 @@ class PingMsg:
         self._id = id
 
     def __str__(self):
-        header = f'{self._seq} {self._id} {self._id+55555} {self._flag} {self._myPos}'
+        header = f'{self._seq} {self._id} {self._id+56677} {self._flag} {self._myPos}'
         send_msg = f'header: {header}, msg: {self.msg}'
         return send_msg
 
@@ -143,7 +143,7 @@ class TCPMsg:
         self._id = id
 
     def __str__(self):
-        header = f'{self._id} {self._id+55555} {self._flag} {self._myPos}'
+        header = f'{self._id} {self._id+56677} {self._flag} {self._myPos}'
         send_msg = f'{header} {self.msg}'
         return send_msg
 
@@ -267,7 +267,7 @@ def updateNext(new_Succ1, new_Succ2):
 # send TCP Message from random port (by TCP)
 def sendTCPMsg(msg, destId):
     destId = int(destId)
-    destPort = 55555 + destId # will be reset after demo
+    destPort = 56677 + destId # will be reset after demo
     send_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         send_socket.connect(('localhost', destPort))
@@ -287,7 +287,7 @@ def sendPingMsg(msg, destId):
 
     c_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     # will be reset to 50000+id after demo
-    destPort = 55555 + destId
+    destPort = 56677 + destId
     destServer = ('localhost', destPort)
     c_socket.sendto(msg, destServer)
 
@@ -309,13 +309,13 @@ def sendFileMsg(msg, destId, resend = False):
     rand = random.random()
     if rand >= dropRate:
         destServer = ('localhost', destPort)
-        
+
         if resend == True and IM_SENDER:
             recordLog('sender', 'RTX', (time.time()-startTime), extract.seq, len(extract.content), extract.ack)
         else:
             recordLog(role, 'Snd', (time.time()-startTime), extract.seq, len(extract.content), extract.ack)
 
-        c_socket.sendto(msg, destServer) 
+        c_socket.sendto(msg, destServer)
 
     else:
         # print(f"\n---------<<File Pkt LOST>> dest to {destId}--------\n")
@@ -396,7 +396,7 @@ def FileHandler():
                 if retransmit > 4:
                     # print("retransmit 5 times already")
                     break
-    
+
                 sendFileMsg(pickle.dumps(lastPkt), theReceiver, True)
                 # print(f"Resend pkt: {lastPkt}")
                 retransmit += 1
@@ -433,7 +433,7 @@ def FileHandler():
                         respMsg = FileSegment(newSeq, None, PAYLOAD, chunk, MSS)
 
                     sendFileMsg(pickle.dumps(respMsg), theReceiver)
-                    
+
                     # print(f'Send pkt: {respMsg}')
                     lastSentSeq = newSeq
                     lastPkt = respMsg
@@ -452,7 +452,7 @@ def FileHandler():
             if srcSeq == lastRecvSeq:
                 respMsg = FileSegment(None, lastSentAck, ACK, None, MSS)
                 sendFileMsg(pickle.dumps(respMsg), theSender)
-                
+
 
             # receive payload, load chunk and send ACK
             elif srcSeq >= lastSentAck:
@@ -534,7 +534,7 @@ def pingListener():
 
     s_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     host = 'localhost'
-    port = 55555 + myId # will be reset after demo
+    port = 56677 + myId # will be reset after demo
     server = (host, port)
     # bind a socket for UDP listener
     s_socket.bind(server)
@@ -567,6 +567,8 @@ def pingListener():
                 sendTCPMsg(pickle.dumps(sendData), mySucc1)
 
                 # balance last ping to avoid further change
+                # and will re-request again if I didn't update
+                # my successors info successfully
                 lastPing['Succ2'] += 2
 
             # Succ1 died, request info from Succ2
@@ -576,6 +578,8 @@ def pingListener():
                 sendTCPMsg(pickle.dumps(sendData), mySucc2)
 
                 # balance last ping to avoid further change
+                # and will re-request again if I didn't update
+                # my successors info successfully
                 lastPing['Succ1'] += 2
 
         elif flag == 'REQUEST':
@@ -607,7 +611,7 @@ def TCPHandler():
 
     # create socket
     listen_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    listen_socket.bind(('localhost', 55555+myId))   # will reset after demo
+    listen_socket.bind(('localhost', 56677+myId))   # will reset after demo
 
     while not FINISH:
         # check FINISH condition every 10 sec
@@ -700,6 +704,8 @@ def TCPHandler():
             assert (srcMsg is not None)
             deadPeer = int(srcMsg)
             # if the dead peer still in my successors, ignore
+            # the predecessor will re-send INFO_REQUEST when it finds its
+            # successor is dead.
             if (srcId == myPrev1) and (deadPeer in [mySucc1, mySucc2]):
                 pass
             else:
