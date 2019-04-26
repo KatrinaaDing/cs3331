@@ -101,7 +101,7 @@ class PingMsg:
         self._id = id
 
     def __str__(self):
-        header = f'{self._seq} {self._id} {self._id+56677} {self._flag} {self._myPos}'
+        header = f'{self._seq} {self._id} {self._id+50000} {self._flag} {self._myPos}'
         send_msg = f'header: {header}, msg: {self.msg}'
         return send_msg
 
@@ -143,7 +143,7 @@ class TCPMsg:
         self._id = id
 
     def __str__(self):
-        header = f'{self._id} {self._id+56677} {self._flag} {self._myPos}'
+        header = f'{self._id} {self._id+50000} {self._flag} {self._myPos}'
         send_msg = f'{header} {self.msg}'
         return send_msg
 
@@ -267,7 +267,7 @@ def updateNext(new_Succ1, new_Succ2):
 # send TCP Message from random port (by TCP)
 def sendTCPMsg(msg, destId):
     destId = int(destId)
-    destPort = 56677 + destId # will be reset after demo
+    destPort = 50000 + destId # will be reset after demo
     send_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         send_socket.connect(('localhost', destPort))
@@ -287,7 +287,7 @@ def sendPingMsg(msg, destId):
 
     c_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     # will be reset to 50000+id after demo
-    destPort = 56677 + destId
+    destPort = 50000 + destId
     destServer = ('localhost', destPort)
     c_socket.sendto(msg, destServer)
 
@@ -534,7 +534,7 @@ def pingListener():
 
     s_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     host = 'localhost'
-    port = 56677 + myId # will be reset after demo
+    port = 50000 + myId # will be reset after demo
     server = (host, port)
     # bind a socket for UDP listener
     s_socket.bind(server)
@@ -611,7 +611,7 @@ def TCPHandler():
 
     # create socket
     listen_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    listen_socket.bind(('localhost', 56677+myId))   # will reset after demo
+    listen_socket.bind(('localhost', 50000+myId))   # will reset after demo
 
     while not FINISH:
         # check FINISH condition every 10 sec
