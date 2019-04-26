@@ -36,6 +36,7 @@ lastRecvAck = -1
 IM_RECEIVER = False
 theSender = -1
 lastRecvSeq = -1
+lastSentAck = -1
 
 myId = int(sys.argv[1])         # read my id from command line
 mySucc1 = int(sys.argv[2])      # read my first successor
@@ -266,7 +267,7 @@ def updateNext(new_Succ1, new_Succ2):
 # send TCP Message from random port (by TCP)
 def sendTCPMsg(msg, destId):
     destId = int(destId)
-    destPort = 55555 + destId
+    destPort = 55555 + destId # will be reset after demo
     send_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         send_socket.connect(('localhost', destPort))
@@ -274,6 +275,7 @@ def sendTCPMsg(msg, destId):
 
     # try again if connection refused
     except:
+        # print("connection refused, ready to try again")
         time.sleep(1)
         send_socket.connect(('localhost', destPort))
         send_socket.send(msg)
@@ -284,7 +286,7 @@ def sendPingMsg(msg, destId):
     global myId, mySucc1, mySucc2, myPrev1, myPrev2
 
     c_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
+    # will be reset to 50000+id after demo
     destPort = 55555 + destId
     destServer = ('localhost', destPort)
     c_socket.sendto(msg, destServer)
@@ -292,24 +294,35 @@ def sendPingMsg(msg, destId):
     c_socket.close()
 
 # send File Segment and ACK from random Port (by UDP)
-def sendFileMsg(msg, destId):
+def sendFileMsg(msg, destId, resend = False):
     global lastSentSeq, lastRecvAck
     # as assignmetn doesn't specify a port for file transfer,
-    # make id+50256 be port to receive file msg
+    # make id+60256 be port to receive file msg
     destPort = int(destId) + 60256
     c_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    extract = pickle.loads(msg)
+    if IM_SENDER:
+        role = 'sender'
+    if IM_RECEIVER:
+        role = 'receiver'
+
     rand = random.random()
     if rand >= dropRate:
         destServer = ('localhost', destPort)
-        c_socket.sendto(msg, destServer)
+        
+        if resend == True and IM_SENDER:
+            recordLog('sender', 'RTX', (time.time()-startTime), extract.seq, len(extract.content), extract.ack)
+        else:
+            recordLog(role, 'Snd', (time.time()-startTime), extract.seq, len(extract.content), extract.ack)
+
+        c_socket.sendto(msg, destServer) 
+
     else:
         # print(f"\n---------<<File Pkt LOST>> dest to {destId}--------\n")
-        extract = pickle.loads(msg)
-        if IM_SENDER:
-            role = 'sender'
-        if IM_RECEIVER:
-            role = 'receiver'
-        recordLog(role, 'drop', (time.time()-startTime), extract.seq, len(extract.content), extract.ack)
+        if resend == True:
+            recordLog(role, 'drop/RTX', (time.time()-startTime), extract.seq, len(extract.content), extract.ack)
+        else:
+            recordLog(role, 'drop', (time.time()-startTime), extract.seq, len(extract.content), extract.ack)
 
 # function to record log.txt file
 def recordLog(role, event, time, seq, dataNum, ack):
@@ -320,12 +333,12 @@ def recordLog(role, event, time, seq, dataNum, ack):
 
     if role == 'sender':
         respondLog_fp = open('responding_log.txt', 'a')
-        respondLog_fp.write(f'{event}\t{time}\t{seq}\t{dataNum}\t{ack}\n')
+        respondLog_fp.write('%-10s %5.6f\t%-10s %-10s %-10s\n' % (event,time,seq,dataNum,ack))
         respondLog_fp.close()
 
     elif role == 'receiver':
         requestLog_fp = open('requesting_log.txt', 'a')
-        requestLog_fp.write(f'{event}\t{time}\t{seq}\t{dataNum}\t{ack}\n')
+        requestLog_fp.write('%-10s %5.6f\t%-10s %-10s %-10s\n' % (event,time,seq,dataNum,ack))
         requestLog_fp.close()
 
 '''
@@ -333,7 +346,7 @@ Threading function
 '''
 # thread that handle file transfering. Only start when a file request/response are successfully received
 def FileHandler():
-    global myId, targetFile, MSS, theReceiver, theSender, lastSentSeq, lastRecvAck, lastRecvSeq, IM_SENDER, IM_RECEIVER, FINISH
+    global myId, targetFile, MSS, theReceiver, theSender, lastSentSeq, lastRecvAck, lastRecvSeq,lastSentAck, IM_SENDER, IM_RECEIVER, FINISH
 
     print(f"Peer {myId}: File Handler thread started")
     s_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -358,9 +371,10 @@ def FileHandler():
 
         chunk = fp_read.read(MSS)
         initialSeqNum = random.randint(100, 1000)
+        # wait for receiver for 1 sec to open socket
+        time.sleep(1)
         sendPkt = FileSegment(initialSeqNum, None, PAYLOAD, chunk, MSS)
         sendFileMsg(pickle.dumps(sendPkt), theReceiver)
-        recordLog('sender', 'Snd', (time.time()-startTime), sendPkt.seq, len(sendPkt.content), sendPkt.ack)
         # print(f'Send pkt: {sendPkt}')
 
         lastPkt = sendPkt
@@ -380,12 +394,11 @@ def FileHandler():
         except socket.timeout:
             if IM_SENDER and lastPkt is not None:
                 if retransmit > 4:
-                    print("retransmit 4 times already")
+                    # print("retransmit 5 times already")
                     break
-                sendFileMsg(pickle.dumps(lastPkt), theReceiver)
+    
+                sendFileMsg(pickle.dumps(lastPkt), theReceiver, True)
                 # print(f"Resend pkt: {lastPkt}")
-                recordLog('sender', 'RTX', (time.time()-startTime), lastPkt.seq, len(lastPkt.content), lastPkt.ack)
-
                 retransmit += 1
                 continue
             else:
@@ -406,11 +419,7 @@ def FileHandler():
             recordLog('sender', 'rcv', (time.time()-startTime), srcSeq, len(srcContent), srcAck)
             #print("I'm Sender:")
 
-            # detect duplicate
-            if srcSeq == lastRecvAck:
-                print("Received duplicate, ignore.")
-                pass
-            elif srcAck > lastRecvAck:
+            if srcAck > lastRecvAck:
                 if srcAck == (lastSentSeq + len(lastPkt.content)):
                     newSeq = srcAck
                     lastRecvAck = srcAck
@@ -424,15 +433,14 @@ def FileHandler():
                         respMsg = FileSegment(newSeq, None, PAYLOAD, chunk, MSS)
 
                     sendFileMsg(pickle.dumps(respMsg), theReceiver)
-                    recordLog('sender', 'Snd', (time.time()-startTime), respMsg.seq, len(respMsg.content), respMsg.ack)
+                    
                     # print(f'Send pkt: {respMsg}')
                     lastSentSeq = newSeq
                     lastPkt = respMsg
                 else:
-                    print("Received out of order ACK, ignore.")
-                    pass
+                    print("!!!! ERROR: Received unexpected ACK")
             else:
-                print("!!!!!! ERROR: srcACK < lastRecvAck")
+                print("srcACK =< lastRecvAck, ignore")
 
         # if the reqeusting file get a PAYLOAD, load the payload and respond with ACK
         elif srcFlag == PAYLOAD:
@@ -442,23 +450,20 @@ def FileHandler():
 
             # detect duplicate, ignore payload and resend ACK
             if srcSeq == lastRecvSeq:
-                newAck = srcSeq + len(srcContent)
-                respMsg = FileSegment(None, newAck, ACK, None, MSS)
+                respMsg = FileSegment(None, lastSentAck, ACK, None, MSS)
                 sendFileMsg(pickle.dumps(respMsg), theSender)
-                recordLog('receiver', 'RTX', (time.time()-startTime), respMsg.seq, len(respMsg.content), respMsg.ack)
-
+                
 
             # receive payload, load chunk and send ACK
-            elif srcSeq > lastRecvSeq:
+            elif srcSeq >= lastSentAck:
                 lastRecvSeq = srcSeq
                 newAck = srcSeq + len(srcContent)
 
                 fp_write.write(srcContent)
                 respMsg = FileSegment(None, newAck, ACK, None, MSS)
                 sendFileMsg(pickle.dumps(respMsg), theSender)
-                recordLog('receiver', 'Snd', (time.time()-startTime), respMsg.seq, len(respMsg.content), respMsg.ack)
-                # print(f'Send pkt: {respMsg}')
 
+                lastSentAck = newAck
             else:
                 print("!!!!!! ERROR: srcSeq < lastRecvSeq")
 
@@ -473,13 +478,12 @@ def FileHandler():
             respMsg = FileSegment(None, newAck, FINACK, None, MSS)
             sendFileMsg(pickle.dumps(respMsg), theSender)
             lastPkt = respMsg
-            recordLog('receiver', 'Snd', (time.time()-startTime), respMsg.seq, len(respMsg.content), respMsg.ack)
             break
 
         # sender received a FINACK
         elif srcFlag == FINACK:
             assert(IM_SENDER)
-            recordLog('sender', 'rcv', (time.time() - startTime), srcSeq, len(srcContent), srcAck)
+            recordLog('sender', 'rcv', (time.time()-startTime), srcSeq, len(srcContent), srcAck)
             # print("Get FINACK")
             break
 
@@ -518,7 +522,7 @@ def pingSender():
             # print(f'------------Sending Ping to Peer {s}------------\n')
 
         seqNum += 1
-        time.sleep(30)
+        time.sleep(20)
 
     print("pingSender exiting...")
 
@@ -530,7 +534,7 @@ def pingListener():
 
     s_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     host = 'localhost'
-    port = 55555 + myId
+    port = 55555 + myId # will be reset after demo
     server = (host, port)
     # bind a socket for UDP listener
     s_socket.bind(server)
@@ -557,7 +561,7 @@ def pingListener():
             print(recvMsg)
 
             # Succ2 died, request info from Succ1
-            if lastPing['Succ1'] - lastPing['Succ2'] > 5:
+            if lastPing['Succ1'] - lastPing['Succ2'] > 3:
                 print(f"Peer {mySucc2} is no longer alive.")
                 sendData = TCPMsg(myId, INFO_REQUEST, 'Prev1', mySucc2)
                 sendTCPMsg(pickle.dumps(sendData), mySucc1)
@@ -566,7 +570,7 @@ def pingListener():
                 lastPing['Succ2'] += 2
 
             # Succ1 died, request info from Succ2
-            if lastPing['Succ2'] - lastPing['Succ1'] > 5:
+            if lastPing['Succ2'] - lastPing['Succ1'] > 3:
                 print(f'Peer {mySucc1} is no longer alive.')
                 sendData = TCPMsg(myId, INFO_REQUEST, 'Prev2', mySucc1)
                 sendTCPMsg(pickle.dumps(sendData), mySucc2)
@@ -603,7 +607,7 @@ def TCPHandler():
 
     # create socket
     listen_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    listen_socket.bind(('localhost', 55555+myId))
+    listen_socket.bind(('localhost', 55555+myId))   # will reset after demo
 
     while not FINISH:
         # check FINISH condition every 10 sec
@@ -715,12 +719,10 @@ def TCPHandler():
 
             # if responding peer is mySucc1, make its Succ1 be mySucc2
             if srcPos == 'Succ1':
-                print('Updating Succ1...')
                 updateNext(None, new_Succ1)
 
             # if responding peer is mySucc2, make it mySucc1 and make its Succ1 be mySucc2
             elif srcPos == 'Succ2':
-                print('Updating Succ2...')
                 updateNext(mySucc2, new_Succ1)
 
         conn.close()
