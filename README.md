@@ -1,5 +1,5 @@
-# cs3331
-Notes in cs3331
+# P2P simualtion
+
 
 The spec is indicated in [Assignment.pdf](https://github.com/KatrinaaDing/cs3331/blob/assignment-P2P/Assingment.pdf).
 
